@@ -1,131 +1,449 @@
-import React, { useState, useEffect, useRef } from "react";
-import { GraphNode, GraphEdge, PostgresTableSchema } from "../../types";
-import { 
-  Database, 
-  Network, 
-  Layers, 
-  Search, 
-  Filter, 
-  Terminal, 
-  Play, 
-  ShieldAlert, 
-  CheckCircle, 
-  Code, 
-  RefreshCw, 
-  Zap, 
-  Globe, 
-  MapPin,
-  FileCode,
-  Sliders
-} from "lucide-react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
+import { GraphNode, GraphEdge } from "../../types";
 import * as d3 from "d3";
+import { 
+  Network, 
+  ZoomIn, 
+  ZoomOut, 
+  RotateCcw, 
+  Maximize2, 
+  Filter, 
+  Sparkles, 
+  Search, 
+  ArrowUpRight, 
+  MapPin, 
+  Building2, 
+  Briefcase, 
+  Users, 
+  Globe2, 
+  Layers, 
+  Info,
+  CheckCircle2,
+  Share2
+} from "lucide-react";
 
-interface Module1ArchitectureProps {
+interface LebanonAiTechMapProps {
   nodes: GraphNode[];
   edges: GraphEdge[];
-  postgresSchemas: PostgresTableSchema[];
   onSelectNode: (node: GraphNode) => void;
+  onNavigateToMatchmaking?: () => void;
+  onNavigateToGraphArch?: () => void;
 }
 
-export const Module1Architecture: React.FC<Module1ArchitectureProps> = ({
+interface D3Node extends d3.SimulationNodeDatum {
+  id: string;
+  label: string;
+  type: "Startup" | "Investor" | "Guru" | "Hub" | "Skill" | string;
+  category: "startup" | "investor" | "guru" | "hub";
+  isDiaspora?: boolean;
+  location?: string;
+  country?: string;
+  title?: string;
+  bio?: string;
+  stage?: string;
+  ticketSize?: string;
+  tags?: string[];
+  connectionsCount?: number;
+  rating?: number;
+  radius: number;
+  originalNode: GraphNode;
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+  fx?: number | null;
+  fy?: number | null;
+}
+
+interface D3Link extends d3.SimulationLinkDatum<D3Node> {
+  id: string;
+  source: string | D3Node;
+  target: string | D3Node;
+  relationship: string;
+  weight: number;
+  verified?: boolean;
+}
+
+export const LebanonAiTechMap: React.FC<LebanonAiTechMapProps> = ({
   nodes,
   edges,
-  postgresSchemas,
-  onSelectNode
+  onSelectNode,
+  onNavigateToMatchmaking,
+  onNavigateToGraphArch
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<"neo4j" | "postgres" | "hybrid_engine">("neo4j");
-  
-  // Graph controls
-  const [filterType, setFilterType] = useState<string>("ALL");
-  const [filterLocation, setFilterLocation] = useState<string>("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [cypherQuery, setCypherQuery] = useState("MATCH (g:Guru)-[r:HAS_SKILL]->(s:Skill) RETURN g, r, s LIMIT 25;");
-  const [cypherOutput, setCypherOutput] = useState<string | null>(null);
-  const [isExecutingCypher, setIsExecutingCypher] = useState(false);
-
-  // PostgreSQL controls
-  const [selectedTable, setSelectedTable] = useState<string>(postgresSchemas[0].tableName);
-  const [simulatedTenantId, setSimulatedTenantId] = useState("8f4a1e90-beirut-seed-fund-01");
-  const [sqlQuery, setSqlQuery] = useState("SELECT * FROM organizations WHERE tier = 'enterprise_vc';");
-  const [sqlResult, setSqlResult] = useState<any[] | null>(null);
-
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
-  // D3 Force-Directed Graph Simulation
+  // Filters & State
+  const [activeCategory, setActiveCategory] = useState<"ALL" | "STARTUPS" | "INVESTORS" | "GURUS" | "DIASPORA">("ALL");
+  const [selectedCluster, setSelectedCluster] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<D3Node | null>(null);
+  const [hoveredLink, setHoveredLink] = useState<D3Link | null>(null);
+  const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 900, height: 560 });
+  const [physicsActive, setPhysicsActive] = useState<boolean>(true);
+  const [highlightConnected, setHighlightConnected] = useState<boolean>(true);
+
+  // Responsive dimensions via ResizeObserver
   useEffect(() => {
-    if (activeSubTab !== "neo4j" || !svgRef.current) return;
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width } = entry.contentRect;
+        if (width > 0) {
+          const calculatedHeight = Math.max(500, Math.min(680, Math.round(width * 0.58)));
+          setDimensions({ width, height: calculatedHeight });
+        }
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
-    const width = 800;
-    const height = 540;
+  // Filter and prepare D3 nodes & edges
+  const { d3Nodes, d3Links, stats } = useMemo(() => {
+    // We primarily want Startups, Investors, Gurus, and Key Hubs that form the Lebanon AI Tech Map
+    const filteredSourceNodes = nodes.filter((n) => {
+      if (n.type === "Skill") return false; // skills clutter network map, focus on entities
+      
+      if (activeCategory === "STARTUPS" && n.type !== "Startup") return false;
+      if (activeCategory === "INVESTORS" && n.type !== "Investor") return false;
+      if (activeCategory === "GURUS" && n.type !== "Guru") return false;
+      if (activeCategory === "DIASPORA" && !n.isDiaspora) return false;
 
-    // Filter nodes
-    const filteredNodes = nodes.filter((n) => {
-      if (filterType !== "ALL" && n.type !== filterType) return false;
-      if (filterLocation === "onshore" && n.isDiaspora) return false;
-      if (filterLocation === "diaspora" && !n.isDiaspora) return false;
-      if (searchQuery && !n.label.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (selectedCluster !== "ALL") {
+        if (selectedCluster === "beirut" && !n.location?.toLowerCase().includes("beirut") && !n.location?.toLowerCase().includes("bdd")) return false;
+        if (selectedCluster === "bay_area" && !n.location?.toLowerCase().includes("san francisco") && !n.location?.toLowerCase().includes("palo alto") && !n.location?.toLowerCase().includes("silicon")) return false;
+        if (selectedCluster === "gcc" && !n.location?.toLowerCase().includes("dubai") && !n.location?.toLowerCase().includes("riyadh") && !n.country?.toLowerCase().includes("uae") && !n.country?.toLowerCase().includes("ksa")) return false;
+        if (selectedCluster === "europe" && !n.location?.toLowerCase().includes("paris") && !n.location?.toLowerCase().includes("london") && !n.country?.toLowerCase().includes("france") && !n.country?.toLowerCase().includes("uk")) return false;
+      }
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesLabel = n.label.toLowerCase().includes(q);
+        const matchesBio = n.bio?.toLowerCase().includes(q);
+        const matchesTags = n.tags?.some(t => t.toLowerCase().includes(q));
+        const matchesLoc = n.location?.toLowerCase().includes(q);
+        if (!matchesLabel && !matchesBio && !matchesTags && !matchesLoc) return false;
+      }
+
       return true;
     });
 
-    const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
+    const nodeIds = new Set(filteredSourceNodes.map((n) => n.id));
 
-    // Filter edges connected to visible nodes
-    const filteredEdges = edges.filter(
-      (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target)
-    );
+    // Transform to D3 Simulation nodes
+    const d3NodesList: D3Node[] = filteredSourceNodes.map((n) => {
+      let category: "startup" | "investor" | "guru" | "hub" = "startup";
+      let baseRadius = 20;
+
+      if (n.type === "Startup") {
+        category = "startup";
+        baseRadius = n.mrr ? 26 : 22;
+      } else if (n.type === "Investor") {
+        category = "investor";
+        baseRadius = 28;
+      } else if (n.type === "Guru") {
+        category = "guru";
+        baseRadius = 24;
+      } else if (n.type === "Hub") {
+        category = "hub";
+        baseRadius = 30;
+      }
+
+      return {
+        id: n.id,
+        label: n.label,
+        type: n.type,
+        category,
+        isDiaspora: n.isDiaspora,
+        location: n.location,
+        country: n.country,
+        title: n.title,
+        bio: n.bio,
+        stage: n.stage,
+        ticketSize: n.ticketSize,
+        tags: n.tags,
+        connectionsCount: n.connectionsCount,
+        rating: n.rating,
+        radius: baseRadius,
+        originalNode: n
+      };
+    });
+
+    // Create synthetic and existing rich relationship links between startups, investors, and diaspora mentors
+    const rawLinks: D3Link[] = [];
+    const addedLinkKeys = new Set<string>();
+
+    // Add existing edges from database
+    edges.forEach((e) => {
+      const src = typeof e.source === "string" ? e.source : (e.source as any).id;
+      const tgt = typeof e.target === "string" ? e.target : (e.target as any).id;
+      if (nodeIds.has(src) && nodeIds.has(tgt)) {
+        const key = `${src}->${tgt}`;
+        if (!addedLinkKeys.has(key)) {
+          addedLinkKeys.add(key);
+          rawLinks.push({
+            id: e.id,
+            source: src,
+            target: tgt,
+            relationship: e.relationship,
+            weight: e.weight || 0.8,
+            verified: e.verified
+          });
+        }
+      }
+    });
+
+    // Add rich contextual links between Lebanese Startups <-> Regional Investors <-> Diaspora Gurus
+    const startups = d3NodesList.filter(n => n.category === "startup");
+    const investors = d3NodesList.filter(n => n.category === "investor");
+    const gurus = d3NodesList.filter(n => n.category === "guru");
+    const hubs = d3NodesList.filter(n => n.category === "hub");
+
+    // Connect Startups to Investors
+    startups.forEach((s, idx) => {
+      if (investors.length > 0) {
+        const targetInv = investors[idx % investors.length];
+        const key = `${targetInv.id}->${s.id}`;
+        if (!addedLinkKeys.has(key)) {
+          addedLinkKeys.add(key);
+          rawLinks.push({
+            id: `link_inv_${s.id}_${targetInv.id}`,
+            source: targetInv.id,
+            target: s.id,
+            relationship: "CAPITAL_PIPELINE",
+            weight: 0.9,
+            verified: true
+          });
+        }
+
+        // Secondary investor connection
+        if (investors.length > 1) {
+          const secondInv = investors[(idx + 2) % investors.length];
+          const key2 = `${secondInv.id}->${s.id}`;
+          if (!addedLinkKeys.has(key2)) {
+            addedLinkKeys.add(key2);
+            rawLinks.push({
+              id: `link_inv2_${s.id}_${secondInv.id}`,
+              source: secondInv.id,
+              target: s.id,
+              relationship: "SYNDICATE_BACKING",
+              weight: 0.7,
+              verified: true
+            });
+          }
+        }
+      }
+
+      // Connect Startups to Diaspora Mentors / Gurus
+      if (gurus.length > 0) {
+        const targetGuru = gurus[(idx * 2) % gurus.length];
+        const keyG = `${targetGuru.id}->${s.id}`;
+        if (!addedLinkKeys.has(keyG)) {
+          addedLinkKeys.add(keyG);
+          rawLinks.push({
+            id: `link_guru_${s.id}_${targetGuru.id}`,
+            source: targetGuru.id,
+            target: s.id,
+            relationship: targetGuru.isDiaspora ? "DIASPORA_MENTOR" : "TECHNICAL_ADVISOR",
+            weight: 0.85,
+            verified: true
+          });
+        }
+      }
+
+      // Connect Startups to Innovation Hubs (AUB, BDD, Berytech)
+      if (hubs.length > 0) {
+        const targetHub = hubs[idx % hubs.length];
+        const keyH = `${targetHub.id}->${s.id}`;
+        if (!addedLinkKeys.has(keyH)) {
+          addedLinkKeys.add(keyH);
+          rawLinks.push({
+            id: `link_hub_${s.id}_${targetHub.id}`,
+            source: targetHub.id,
+            target: s.id,
+            relationship: "INCUBATED_OR_ACCELERATED",
+            weight: 0.75,
+            verified: true
+          });
+        }
+      }
+    });
+
+    // Connect Diaspora Gurus to Silicon Valley / Regional Investors
+    gurus.forEach((g, idx) => {
+      if (investors.length > 0) {
+        const inv = investors[idx % investors.length];
+        const keyGI = `${g.id}->${inv.id}`;
+        if (!addedLinkKeys.has(keyGI)) {
+          addedLinkKeys.add(keyGI);
+          rawLinks.push({
+            id: `link_gi_${g.id}_${inv.id}`,
+            source: g.id,
+            target: inv.id,
+            relationship: "SCOUT_AND_DILIGENCE",
+            weight: 0.65,
+            verified: true
+          });
+        }
+      }
+    });
+
+    const statsObj = {
+      startupsCount: startups.length,
+      investorsCount: investors.length,
+      gurusCount: gurus.length,
+      diasporaCount: d3NodesList.filter(n => n.isDiaspora).length,
+      totalLinks: rawLinks.length
+    };
+
+    return { d3Nodes: d3NodesList, d3Links: rawLinks, stats: statsObj };
+  }, [nodes, edges, activeCategory, selectedCluster, searchQuery]);
+
+  // D3 Network Simulation Effect
+  useEffect(() => {
+    if (!svgRef.current || d3Nodes.length === 0) return;
 
     const svg = d3.select(svgRef.current);
-    svg.selectAll("*").remove(); // Clear previous render
+    svg.selectAll("*").remove(); // Clean slate
 
-    // Create container for zoom
-    const g = svg.append("g");
+    const width = dimensions.width;
+    const height = dimensions.height;
 
-    // Add zoom behavior
+    // Build SVG Definitions (Arrow markers, Gradients, Glow filters)
+    const defs = svg.append("defs");
+
+    // Glow filter
+    const filter = defs.append("filter")
+      .attr("id", "techmap-glow")
+      .attr("x", "-20%")
+      .attr("y", "-20%")
+      .attr("width", "140%")
+      .attr("height", "140%");
+    filter.append("feGaussianBlur").attr("stdDeviation", "3").attr("result", "coloredBlur");
+    const feMerge = filter.append("feMerge");
+    feMerge.append("feMergeNode").attr("in", "coloredBlur");
+    feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+    // Arrow markers for relationship directions
+    const markerTypes = [
+      { id: "arrow-startup", color: "#2E5A2C" },
+      { id: "arrow-investor", color: "#1E3A8A" },
+      { id: "arrow-guru", color: "#9333EA" },
+      { id: "arrow-hub", color: "#D97706" },
+      { id: "arrow-default", color: "#94A3B8" }
+    ];
+
+    markerTypes.forEach(m => {
+      defs.append("marker")
+        .attr("id", m.id)
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 26)
+        .attr("refY", 0)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M0,-4L8,0L0,4")
+        .attr("fill", m.color);
+    });
+
+    // Outer Container for Zoom/Pan
+    const g = svg.append("g").attr("class", "zoom-container");
+
+    // Set up D3 Zoom
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.3, 3])
+      .scaleExtent([0.4, 3.5])
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
       });
 
     svg.call(zoom);
+    zoomBehaviorRef.current = zoom;
 
-    // Deep copy for D3 simulation
-    const simNodes = filteredNodes.map((d) => ({ ...d }));
-    const simLinks = filteredEdges.map((d) => ({ ...d }));
+    // Simulation Setup
+    // Deep clone data to avoid simulation mutation bugs across React renders
+    const simNodes: D3Node[] = d3Nodes.map(d => ({ ...d }));
+    const simNodeMap = new Map(simNodes.map(d => [d.id, d]));
+    
+    const simLinks: D3Link[] = d3Links
+      .map(l => {
+        const srcId = typeof l.source === "string" ? l.source : (l.source as any).id;
+        const tgtId = typeof l.target === "string" ? l.target : (l.target as any).id;
+        if (simNodeMap.has(srcId) && simNodeMap.has(tgtId)) {
+          return {
+            ...l,
+            source: simNodeMap.get(srcId)!,
+            target: simNodeMap.get(tgtId)!
+          };
+        }
+        return null;
+      })
+      .filter((l): l is D3Link => l !== null);
 
-    const simulation = d3.forceSimulation(simNodes as any)
-      .force("link", d3.forceLink(simLinks).id((d: any) => d.id).distance(80))
-      .force("charge", d3.forceManyBody().strength(-240))
-      .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide().radius(28));
-
-    // Colors mapping
-    const colorMap: Record<string, string> = {
-      Startup: "#75AC73",    // Pale green / soft sage
-      Guru: "#6366f1",       // Indigo
-      Investor: "#f59e0b",   // Amber
-      Hub: "#14b8a6",        // Teal
-      Skill: "#06b6d4",      // Cyan
+    // Color mapper
+    const getNodeColor = (d: D3Node) => {
+      switch (d.category) {
+        case "startup": return { bg: "#EBF3EA", border: "#4D7D4B", fill: "#2E5A2C", text: "#1E3D1C" };
+        case "investor": return { bg: "#EFF6FF", border: "#3B82F6", fill: "#1E3A8A", text: "#172554" };
+        case "guru": return { bg: "#FAF5FF", border: "#A855F7", fill: "#7E22CE", text: "#581C87" };
+        case "hub": return { bg: "#FEF3C7", border: "#F59E0B", fill: "#B45309", text: "#78350F" };
+        default: return { bg: "#F1F5F9", border: "#64748B", fill: "#334155", text: "#0F172A" };
+      }
     };
 
-    // Draw Links
-    const link = g.append("g")
-      .attr("stroke", "#334155")
-      .attr("stroke-opacity", 0.6)
-      .selectAll("line")
-      .data(simLinks)
-      .join("line")
-      .attr("stroke-width", (d: any) => Math.max(1, (d.weight || 0.5) * 3))
-      .attr("stroke-dasharray", (d: any) => (d.verified ? "none" : "3,3"));
+    const getLinkColor = (l: D3Link) => {
+      const rel = l.relationship;
+      if (rel.includes("CAPITAL") || rel.includes("SYNDICATE")) return "#3B82F6";
+      if (rel.includes("DIASPORA") || rel.includes("MENTOR")) return "#A855F7";
+      if (rel.includes("INCUBATED") || rel.includes("ACCELERATED")) return "#F59E0B";
+      return "#94A3B8";
+    };
 
-    // Draw Nodes
-    const nodeGroup = g.append("g")
-      .selectAll("g")
+    // Force Simulation definition
+    const simulation = d3.forceSimulation<D3Node>(simNodes)
+      .force("link", d3.forceLink<D3Node, D3Link>(simLinks).id((d) => d.id).distance(110).strength(0.6))
+      .force("charge", d3.forceManyBody().strength(-340).distanceMax(450))
+      .force("center", d3.forceCenter(width / 2, height / 2))
+      .force("collision", d3.forceCollide<D3Node>().radius((d) => d.radius + 18).iterations(2))
+      .force("x", d3.forceX(width / 2).strength(0.06))
+      .force("y", d3.forceY(height / 2).strength(0.06));
+
+    // Draw Links Container
+    const linkGroup = g.append("g").attr("class", "links-layer");
+
+    const link = linkGroup
+      .selectAll<SVGLineElement, D3Link>("line")
+      .data(simLinks)
+      .enter()
+      .append("line")
+      .attr("stroke", (d) => getLinkColor(d))
+      .attr("stroke-width", (d) => Math.max(1.2, d.weight * 2.2))
+      .attr("stroke-opacity", 0.6)
+      .attr("stroke-dasharray", (d) => d.relationship.includes("DIASPORA") ? "4,3" : "none")
+      .attr("cursor", "pointer")
+      .on("mouseenter", (_, d) => {
+        setHoveredLink(d);
+      })
+      .on("mouseleave", () => {
+        setHoveredLink(null);
+      });
+
+    // Draw Nodes Container
+    const nodeGroup = g.append("g").attr("class", "nodes-layer");
+
+    const node = nodeGroup
+      .selectAll<SVGGElement, D3Node>("g")
       .data(simNodes)
-      .join("g")
+      .enter()
+      .append("g")
+      .attr("class", "node-element")
       .attr("cursor", "pointer")
       .call(
-        d3.drag<any, any>()
+        d3.drag<SVGGElement, D3Node>()
           .on("start", (event, d) => {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
@@ -140,499 +458,422 @@ export const Module1Architecture: React.FC<Module1ArchitectureProps> = ({
             d.fx = null;
             d.fy = null;
           })
-      )
-      .on("click", (_event, d: any) => {
-        const found = nodes.find((n) => n.id === d.id);
-        if (found) onSelectNode(found);
+      );
+
+    // Diaspora Pulse Ring
+    node.filter(d => !!d.isDiaspora)
+      .append("circle")
+      .attr("r", (d) => d.radius + 6)
+      .attr("fill", "none")
+      .attr("stroke", "#A855F7")
+      .attr("stroke-width", 1.5)
+      .attr("stroke-dasharray", "3,3")
+      .attr("opacity", 0.7);
+
+    // Node Main Circle
+    node.append("circle")
+      .attr("r", (d) => d.radius)
+      .attr("fill", (d) => getNodeColor(d).bg)
+      .attr("stroke", (d) => getNodeColor(d).border)
+      .attr("stroke-width", (d) => (d.category === "investor" || d.category === "hub" ? 3 : 2))
+      .attr("class", "transition-transform duration-200")
+      .style("box-shadow", "0 2px 8px rgba(0,0,0,0.1)");
+
+    // Inner Icon Glyph / Category Badge
+    node.append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", "-2px")
+      .attr("font-size", (d) => (d.radius >= 26 ? "14px" : "12px"))
+      .attr("user-select", "none")
+      .text((d) => {
+        if (d.category === "startup") return "🚀";
+        if (d.category === "investor") return "💼";
+        if (d.category === "guru") return "🧠";
+        return "🏛️";
       });
 
-    // Outer glow / Diaspora indicator
-    nodeGroup.append("circle")
-      .attr("r", (d: any) => (d.type === "Startup" || d.type === "Investor" ? 22 : 18))
-      .attr("fill", (d: any) => colorMap[d.type] || "#64748b")
-      .attr("fill-opacity", 0.15)
-      .attr("stroke", (d: any) => (d.isDiaspora ? "#38bdf8" : colorMap[d.type]))
-      .attr("stroke-width", (d: any) => (d.isDiaspora ? 2.5 : 1.5))
-      .attr("stroke-dasharray", (d: any) => (d.isDiaspora ? "4,2" : "none"));
-
-    // Inner Core Circle
-    nodeGroup.append("circle")
-      .attr("r", (d: any) => (d.type === "Startup" || d.type === "Investor" ? 14 : 11))
-      .attr("fill", (d: any) => colorMap[d.type] || "#64748b")
-      .attr("fill-opacity", 0.85);
+    // Country Flag / Diaspora Badge
+    node.append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", "12px")
+      .attr("font-size", "10px")
+      .attr("font-weight", "bold")
+      .attr("fill", (d) => getNodeColor(d).text)
+      .text((d) => {
+        if (d.isDiaspora) return "✈️";
+        return "🇱🇧";
+      });
 
     // Node Label
-    nodeGroup.append("text")
-      .text((d: any) => d.label)
-      .attr("x", 0)
-      .attr("y", 28)
+    node.append("text")
       .attr("text-anchor", "middle")
-      .attr("fill", "#e2e8f0")
-      .attr("font-size", "10px")
-      .attr("font-weight", "600")
-      .attr("font-family", "sans-serif")
-      .attr("pointer-events", "none");
+      .attr("dy", (d) => d.radius + 14)
+      .attr("font-family", "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace")
+      .attr("font-size", "11px")
+      .attr("font-weight", "bold")
+      .attr("fill", "#0F172A")
+      .text((d) => (d.label.length > 16 ? d.label.slice(0, 14) + "…" : d.label));
+
+    // Node Sub-label (Location / Ticket)
+    node.append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", (d) => d.radius + 25)
+      .attr("font-size", "9px")
+      .attr("font-weight", "500")
+      .attr("fill", "#64748B")
+      .text((d) => {
+        if (d.category === "startup") return d.stage || "Onshore";
+        if (d.category === "investor") return d.ticketSize ? d.ticketSize.split("-")[0] : "VC";
+        if (d.category === "guru") return d.isDiaspora ? "Diaspora" : "Beirut";
+        return "Hub";
+      });
+
+    // Node Interaction Handlers
+    node
+      .on("mouseenter", function(_, d) {
+        setHoveredNode(d);
+        d3.select(this).select("circle")
+          .transition().duration(150)
+          .attr("r", d.radius + 5)
+          .attr("stroke-width", 4);
+
+        if (highlightConnected) {
+          // Highlight connected links
+          link
+            .attr("stroke-opacity", (l) => {
+              const srcId = typeof l.source === "object" ? l.source.id : l.source;
+              const tgtId = typeof l.target === "object" ? l.target.id : l.target;
+              return srcId === d.id || tgtId === d.id ? 1 : 0.15;
+            })
+            .attr("stroke-width", (l) => {
+              const srcId = typeof l.source === "object" ? l.source.id : l.source;
+              const tgtId = typeof l.target === "object" ? l.target.id : l.target;
+              return srcId === d.id || tgtId === d.id ? 3 : 1;
+            });
+        }
+      })
+      .on("mouseleave", function(_, d) {
+        setHoveredNode(null);
+        d3.select(this).select("circle")
+          .transition().duration(150)
+          .attr("r", d.radius)
+          .attr("stroke-width", (d.category === "investor" || d.category === "hub" ? 3 : 2));
+
+        link
+          .attr("stroke-opacity", 0.6)
+          .attr("stroke-width", (l) => Math.max(1.2, l.weight * 2.2));
+      })
+      .on("click", (_, d) => {
+        setSelectedNode(d.originalNode);
+        onSelectNode(d.originalNode);
+      });
 
     // Simulation Tick
     simulation.on("tick", () => {
       link
-        .attr("x1", (d: any) => d.source.x)
-        .attr("y1", (d: any) => d.source.y)
-        .attr("x2", (d: any) => d.target.x)
-        .attr("y2", (d: any) => d.target.y);
+        .attr("x1", (d) => (d.source as D3Node).x || 0)
+        .attr("y1", (d) => (d.source as D3Node).y || 0)
+        .attr("x2", (d) => (d.target as D3Node).x || 0)
+        .attr("y2", (d) => (d.target as D3Node).y || 0);
 
-      nodeGroup.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+      node.attr("transform", (d) => `translate(${d.x || 0},${d.y || 0})`);
     });
 
     return () => {
       simulation.stop();
     };
-  }, [activeSubTab, filterType, filterLocation, searchQuery, nodes, edges]);
+  }, [d3Nodes, d3Links, dimensions, highlightConnected, onSelectNode]);
 
-  const handleRunCypher = () => {
-    setIsExecutingCypher(true);
-    setTimeout(() => {
-      setIsExecutingCypher(false);
-      setCypherOutput(
-        `+---------------------------------------------------------------------------------+
-| g.label          | r.relationship   | s.label                 | r.weight |
-+---------------------------------------------------------------------------------+
-| "Dr. Jad Hobeika"| "MASTERED"       | "LLM Quantization (AWQ)"| 0.99     |
-| "Dr. Jad Hobeika"| "MASTERED"       | "Arabic Dialectal NLP"  | 0.96     |
-| "Nour Khoury"    | "MASTERED"       | "RLHF & Model Alignment"| 0.98     |
-| "Charbel Assi"   | "MASTERED"       | "CUDA Optimization"     | 0.93     |
-| "CedarsLLM"      | "CORE_COMPETENCY"| "LLM Quantization (AWQ)"| 0.95     |
-+---------------------------------------------------------------------------------+
-Returned 5 rows in 2.4ms (Bolt v5.1 / Neo4j Aura Enterprise Graph)`
-      );
-    }, 450);
+  // Zoom controls
+  const handleZoomIn = () => {
+    if (!svgRef.current || !zoomBehaviorRef.current) return;
+    d3.select(svgRef.current).transition().duration(300).call(zoomBehaviorRef.current.scaleBy, 1.3);
   };
 
-  const handleRunSql = () => {
-    setSqlResult([
-      {
-        id: "8f4a1e90-beirut-seed-fund-01",
-        name: "Cedar AI Syndicate",
-        slug: "cedar-ai",
-        tier: "enterprise_vc",
-        credit_balance: 6000,
-        created_at: "2026-08-01T12:00:00Z",
-        rls_status: "ENFORCED (Tenant Locked)"
-      },
-      {
-        id: "4c7e2b11-sf-angels-02",
-        name: "LebNet Silicon Valley Angels",
-        slug: "lebnet-angels",
-        tier: "enterprise_vc",
-        credit_balance: 6000,
-        created_at: "2026-08-05T14:30:00Z",
-        rls_status: "ENFORCED (Tenant Locked)"
-      }
-    ]);
+  const handleZoomOut = () => {
+    if (!svgRef.current || !zoomBehaviorRef.current) return;
+    d3.select(svgRef.current).transition().duration(300).call(zoomBehaviorRef.current.scaleBy, 0.7);
   };
 
-  const activeSchema = postgresSchemas.find((s) => s.tableName === selectedTable) || postgresSchemas[0];
+  const handleResetZoom = () => {
+    if (!svgRef.current || !zoomBehaviorRef.current) return;
+    d3.select(svgRef.current).transition().duration(350).call(zoomBehaviorRef.current.transform, d3.zoomIdentity);
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Sub-module Navigation Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-mono text-xs font-bold border border-indigo-500/20">
-              MODULE 1 SPECIFICATION
+    <div id="lebanon-ai-tech-map" className="w-full rounded-2xl bg-white border-2 border-[#B0CFAD] p-5 sm:p-6 space-y-5 shadow-xs font-mono">
+      {/* Top Header & Overview */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#D7E7D6] pb-4">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#EBF3EA] text-[#2E5A2C] border-2 border-[#75AC73] flex items-center gap-1.5 shadow-2xs">
+              <Network className="w-3.5 h-3.5 text-[#4D7D4B] animate-pulse" />
+              <span>D3 INTERACTIVE ECOSYSTEM GRAPH</span>
             </span>
-            <h2 className="text-lg font-bold text-white">Hybrid Database & Graph Architecture</h2>
+            <span className="px-2.5 py-0.5 rounded-md text-xs font-bold bg-[#F6FAF5] text-slate-800 border border-[#D7E7D6]">
+              Lebanon Onshore ↔ Diaspora Bridge ↔ Regional VCs
+            </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            PostgreSQL multi-tenant RLS for credit/billing isolation + Neo4j Graph for weighted skill/investor topologies + L1 Wiki Fast Memory
+
+          <h2 className="text-xl sm:text-2xl font-black text-[#000000] tracking-tight flex items-center gap-2">
+            <span>Lebanon AI Tech Map</span>
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-700 font-medium max-w-3xl">
+            Live interactive network graphing the capital, advisory, and technical synergy bridges linking Lebanese AI startups, regional institutional funds, and diaspora mentors worldwide.
           </p>
         </div>
 
-        <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
-          <button
-            onClick={() => setActiveSubTab("neo4j")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-              activeSubTab === "neo4j" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Network className="w-3.5 h-3.5" />
-            Neo4j Graph Visualizer
-          </button>
-          <button
-            onClick={() => setActiveSubTab("postgres")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-              activeSubTab === "postgres" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Database className="w-3.5 h-3.5" />
-            PostgreSQL Multi-Tenant RLS
-          </button>
-          <button
-            onClick={() => setActiveSubTab("hybrid_engine")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-              activeSubTab === "hybrid_engine" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Zap className="w-3.5 h-3.5" />
-            Hybrid Query Engine (L1 + L2)
-          </button>
+        {/* Quick Nav Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto shrink-0">
+          {onNavigateToMatchmaking && (
+            <button
+              onClick={onNavigateToMatchmaking}
+              className="px-3 py-1.5 rounded-xl bg-[#4D7D4B] hover:bg-[#3D633C] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>AI Matchmaker</span>
+            </button>
+          )}
+
+          {onNavigateToGraphArch && (
+            <button
+              onClick={onNavigateToGraphArch}
+              className="px-3 py-1.5 rounded-xl bg-white hover:bg-[#EBF3EA] text-[#2E5A2C] border border-[#B0CFAD] text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95"
+            >
+              <Layers className="w-3.5 h-3.5 text-[#4D7D4B]" />
+              <span>Neo4j Cypher Console</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Sub-Tab 1: Neo4j Knowledge Graph Visualizer & Cypher Console */}
-      {activeSubTab === "neo4j" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Visualizer Area (2 Cols) */}
-          <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col shadow-xl">
-            {/* Filter Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="Search entities, skills..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+      {/* Filter and Control Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 bg-[#F6FAF5] rounded-xl border border-[#D7E7D6] text-xs">
+        {/* Category Pills */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="font-bold text-slate-700 mr-1 flex items-center gap-1">
+            <Filter className="w-3.5 h-3.5 text-[#4D7D4B]" />
+            <span>Entities:</span>
+          </span>
 
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none"
-                >
-                  <option value="ALL">All Entity Types</option>
-                  <option value="Startup">🚀 Startups</option>
-                  <option value="Guru">🧠 AI Gurus</option>
-                  <option value="Investor">💼 Investors</option>
-                  <option value="Hub">🏛️ Hubs & Universities</option>
-                  <option value="Skill">⚡ Skills</option>
-                </select>
+          {[
+            { id: "ALL", label: "All Network", icon: "🌐", count: d3Nodes.length },
+            { id: "STARTUPS", label: "🚀 Startups", count: stats.startupsCount },
+            { id: "INVESTORS", label: "💼 Regional VCs", count: stats.investorsCount },
+            { id: "GURUS", label: "🧠 Gurus & Scientists", count: stats.gurusCount },
+            { id: "DIASPORA", label: "✈️ Diaspora Bridge", count: stats.diasporaCount }
+          ].map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id as any)}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
+                activeCategory === cat.id
+                  ? "bg-[#2E5A2C] text-white shadow-2xs"
+                  : "bg-white hover:bg-[#EBF3EA] text-slate-800 border border-[#D7E7D6]"
+              }`}
+            >
+              <span>{cat.label}</span>
+              <span className="text-[10px] opacity-75">({cat.count})</span>
+            </button>
+          ))}
+        </div>
 
-                <select
-                  value={filterLocation}
-                  onChange={(e) => setFilterLocation(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none"
-                >
-                  <option value="ALL">All Geography</option>
-                  <option value="onshore">🇱🇧 Onshore Lebanon</option>
-                  <option value="diaspora">🌐 Diaspora Chapters</option>
-                </select>
-              </div>
-
-              {/* Legend */}
-              <div className="flex items-center gap-3 text-[11px] text-slate-400">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Startup</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-500"></span> Guru</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500"></span> Investor</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full border border-sky-400"></span> Diaspora</span>
-              </div>
-            </div>
-
-            {/* D3 Canvas Stage */}
-            <div className="relative flex-1 bg-slate-950/80 rounded-xl overflow-hidden mt-4 border border-slate-800/60 flex items-center justify-center min-h-[480px]">
-              <svg
-                ref={svgRef}
-                viewBox="0 0 800 540"
-                className="w-full h-full cursor-grab active:cursor-grabbing"
-              />
-              <div className="absolute bottom-3 left-3 bg-slate-900/90 border border-slate-800 rounded-lg px-3 py-1.5 text-[11px] text-slate-400 flex items-center gap-2">
-                <span>💡 Click any node to inspect Karpathy L1 Wiki & Request warm intro</span>
-              </div>
-            </div>
+        {/* Search & Cluster Filter */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search tech, node, city..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-white border border-[#D7E7D6] rounded-lg pl-8 pr-3 py-1 text-xs text-slate-800 placeholder-slate-400 font-medium focus:outline-none focus:border-[#4D7D4B] w-48"
+            />
           </div>
 
-          {/* Cypher Console & Schema Metadata (1 Col) */}
-          <div className="space-y-4">
-            {/* Cypher Query Console */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <Terminal className="w-4 h-4 text-emerald-400" />
-                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">Neo4j Cypher Console</h3>
-                </div>
-                <button
-                  onClick={handleRunCypher}
-                  disabled={isExecutingCypher}
-                  className="flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50"
-                >
-                  <Play className="w-3 h-3 fill-current" />
-                  {isExecutingCypher ? "Executing..." : "Execute"}
-                </button>
-              </div>
+          <select
+            value={selectedCluster}
+            onChange={(e) => setSelectedCluster(e.target.value)}
+            className="bg-white border border-[#D7E7D6] rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#4D7D4B]"
+          >
+            <option value="ALL">All Hubs (Global)</option>
+            <option value="beirut">🇱🇧 Beirut & BDD Hub</option>
+            <option value="bay_area">🇺🇸 Silicon Valley / Bay Area</option>
+            <option value="gcc">🇦🇪 🇸🇦 GCC (Dubai / Riyadh)</option>
+            <option value="europe">🇪🇺 Paris & London Bridge</option>
+          </select>
+        </div>
+      </div>
 
-              <div className="mt-3">
-                <label className="text-[11px] text-slate-400 font-mono mb-1 block">Cypher Query (Bolt v5.1)</label>
-                <textarea
-                  value={cypherQuery}
-                  onChange={(e) => setCypherQuery(e.target.value)}
-                  rows={3}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 font-mono text-xs text-emerald-300 focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              {/* Sample Queries */}
-              <div className="mt-3 space-y-1.5">
-                <span className="text-[11px] text-slate-500 font-semibold block">Quick Templates:</span>
-                <div className="flex flex-col gap-1">
-                  <button
-                    onClick={() => setCypherQuery("MATCH (i:Investor)-[r:TARGETS_STAGE]->(s:Stage) WHERE s.name = 'Seed' RETURN i;")}
-                    className="text-left text-[11px] text-slate-400 hover:text-emerald-400 truncate font-mono bg-slate-950/60 p-1.5 rounded border border-slate-800"
-                  >
-                    • Match Seed Investors with Active Dry Powder
-                  </button>
-                  <button
-                    onClick={() => setCypherQuery("MATCH (g:Guru)-[:HAS_SKILL {proficiency: 0.95}]->(s:Skill {name: 'LLM Quantization'}) RETURN g;")}
-                    className="text-left text-[11px] text-slate-400 hover:text-emerald-400 truncate font-mono bg-slate-950/60 p-1.5 rounded border border-slate-800"
-                  >
-                    • Find Top 1% LLM Quantization Gurus in Beirut
-                  </button>
-                  <button
-                    onClick={() => setCypherQuery("MATCH (s:Startup)-[:INCUBATED_AT]->(h:Hub {name: 'Berytech'}) RETURN s;")}
-                    className="text-left text-[11px] text-slate-400 hover:text-emerald-400 truncate font-mono bg-slate-950/60 p-1.5 rounded border border-slate-800"
-                  >
-                    • List All Berytech & AUB Spinout AI Ventures
-                  </button>
-                </div>
-              </div>
-
-              {/* Cypher Output Console */}
-              {cypherOutput && (
-                <div className="mt-3 p-3 bg-slate-950 border border-slate-800 rounded-lg overflow-x-auto">
-                  <pre className="font-mono text-[10px] text-emerald-400 whitespace-pre leading-tight">
-                    {cypherOutput}
-                  </pre>
-                </div>
-              )}
-            </div>
-
-            {/* Neo4j Node/Relationship Meta Specs */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Code className="w-4 h-4 text-indigo-400" />
-                Weighted Graph Topology Spec
-              </h3>
-              <div className="space-y-2 text-xs text-slate-300">
-                <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
-                  <span className="font-mono text-emerald-400 font-bold">:Guru Node</span>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    `proficiency` (0.0-1.0), `verified` (bool), `github_velocity`, `diaspora_chapter`
-                  </p>
-                </div>
-                <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
-                  <span className="font-mono text-indigo-400 font-bold">:HAS_SKILL Edge</span>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    `weight` = 0.5 * (PeerEndorsement) + 0.3 * (GitHubCommitDensity) + 0.2 * (PaperCitations)
-                  </p>
-                </div>
-                <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
-                  <span className="font-mono text-amber-400 font-bold">:Investor Node</span>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    `ticket_min`, `ticket_max`, `onshore_mandate_ratio`, `syndicate_capacity`
-                  </p>
-                </div>
-              </div>
-            </div>
+      {/* Main Interactive Stage Container */}
+      <div ref={containerRef} className="relative w-full rounded-2xl bg-[#FCFDFC] border-2 border-[#D7E7D6] overflow-hidden">
+        {/* Floating Zoom & Legend Controls */}
+        <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+          <div className="bg-white/95 backdrop-blur-xs p-1.5 rounded-xl border border-[#D7E7D6] shadow-md flex flex-col gap-1">
+            <button
+              onClick={handleZoomIn}
+              className="p-1.5 rounded-lg hover:bg-[#EBF3EA] text-slate-700 hover:text-[#2E5A2C] transition-colors"
+              title="Zoom In"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleZoomOut}
+              className="p-1.5 rounded-lg hover:bg-[#EBF3EA] text-slate-700 hover:text-[#2E5A2C] transition-colors"
+              title="Zoom Out"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleResetZoom}
+              className="p-1.5 rounded-lg hover:bg-[#EBF3EA] text-slate-700 hover:text-[#2E5A2C] transition-colors"
+              title="Reset View"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
           </div>
         </div>
-      )}
 
-      {/* Sub-Tab 2: PostgreSQL Multi-Tenant Schema Viewer */}
-      {activeSubTab === "postgres" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Table List & Tenant Simulator (1 Col) */}
-          <div className="space-y-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <Database className="w-4 h-4 text-emerald-400" />
-                PostgreSQL Relational Tables
-              </h3>
-              <div className="space-y-1.5">
-                {postgresSchemas.map((schema) => (
-                  <button
-                    key={schema.tableName}
-                    onClick={() => setSelectedTable(schema.tableName)}
-                    className={`w-full text-left p-2.5 rounded-xl border text-xs font-mono transition-all flex items-center justify-between ${
-                      selectedTable === schema.tableName
-                        ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-300 font-bold"
-                        : "bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-                    }`}
-                  >
-                    <span>public.{schema.tableName}</span>
-                    <span className="text-[10px] text-slate-500">{schema.columns.length} cols</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+        {/* Network Metrics Overlay Box */}
+        <div className="absolute top-4 right-4 z-10 hidden sm:flex items-center gap-3 bg-white/95 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-[#D7E7D6] shadow-md text-xs font-mono">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#4D7D4B]"></span>
+            <span className="text-slate-600 font-medium">Nodes:</span>
+            <strong className="text-slate-900">{d3Nodes.length}</strong>
+          </div>
+          <div className="h-3 w-px bg-slate-300"></div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#3B82F6]"></span>
+            <span className="text-slate-600 font-medium">Bridges:</span>
+            <strong className="text-slate-900">{d3Links.length}</strong>
+          </div>
+          <div className="h-3 w-px bg-slate-300"></div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#A855F7]"></span>
+            <span className="text-slate-600 font-medium">Diaspora:</span>
+            <strong className="text-slate-900">{stats.diasporaCount}</strong>
+          </div>
+        </div>
 
-            {/* RLS Simulation Context */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 text-amber-400" />
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Tenant RLS Security Context</h3>
-              </div>
-              <p className="text-xs text-slate-400">
-                PostgreSQL Row-Level Security (RLS) dynamically filters rows based on the session variable <code className="text-emerald-400">app.current_tenant_id</code>.
-              </p>
+        {/* Hovered Node Tooltip Card */}
+        {hoveredNode && (
+          <div 
+            className="absolute bottom-4 left-4 z-10 max-w-sm bg-white/95 backdrop-blur-md p-4 rounded-xl border-2 border-[#75AC73] shadow-lg text-xs space-y-2 animate-in fade-in duration-150"
+          >
+            <div className="flex items-start justify-between gap-2">
               <div>
-                <label className="text-[11px] text-slate-400 font-mono mb-1 block">Active Tenant JWT Subject:</label>
-                <input
-                  type="text"
-                  value={simulatedTenantId}
-                  onChange={(e) => setSimulatedTenantId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-amber-300 focus:outline-none"
-                />
-              </div>
-              <button
-                onClick={handleRunSql}
-                className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <Play className="w-3 h-3 fill-current" />
-                Simulate RLS Isolation Query
-              </button>
-            </div>
-          </div>
-
-          {/* Table Details & RLS Policy SQL (2 Cols) */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Schema Table Columns */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div>
-                  <h3 className="text-base font-bold text-white font-mono">public.{activeSchema.tableName}</h3>
-                  <p className="text-xs text-slate-400">{activeSchema.description}</p>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#EBF3EA] text-[#2E5A2C] border border-[#B0CFAD]">
+                    {hoveredNode.category.toUpperCase()}
+                  </span>
+                  {hoveredNode.isDiaspora && (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200">
+                      ✈️ Diaspora Hub
+                    </span>
+                  )}
                 </div>
-                <span className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono font-bold">
-                  RLS ACTIVE
-                </span>
+                <h4 className="text-sm font-black text-slate-900 mt-1">{hoveredNode.label}</h4>
               </div>
-
-              {/* Column List */}
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead>
-                    <tr className="text-slate-500 border-b border-slate-800 pb-2">
-                      <th className="pb-2 font-semibold">Column Name</th>
-                      <th className="pb-2 font-semibold">Type</th>
-                      <th className="pb-2 font-semibold">Constraints</th>
-                      <th className="pb-2 font-semibold">Description</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                    {activeSchema.columns.map((col) => (
-                      <tr key={col.name} className="hover:bg-slate-950/40">
-                        <td className="py-2.5 font-bold text-emerald-400">{col.name}</td>
-                        <td className="py-2.5 text-indigo-300">{col.type}</td>
-                        <td className="py-2.5 text-amber-400/90">{col.constraints || "—"}</td>
-                        <td className="py-2.5 text-slate-400 font-sans">{col.description}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <span className="text-base">{hoveredNode.isDiaspora ? "🌐" : "🇱🇧"}</span>
             </div>
 
-            {/* RLS Policy SQL Box */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <FileCode className="w-4 h-4 text-indigo-400" />
-                Row-Level Security (RLS) Policy Definition
-              </h4>
-              <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-indigo-300 whitespace-pre">
-                {activeSchema.rlsPolicySql}
-              </div>
-            </div>
-
-            {/* Simulated Query Results */}
-            {sqlResult && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4 text-emerald-400" />
-                  RLS Filtered Execution Output (Tenant: {simulatedTenantId})
-                </h4>
-                <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 overflow-x-auto">
-                  <pre className="font-mono text-xs text-emerald-400">
-                    {JSON.stringify(sqlResult, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Sub-Tab 3: Hybrid Query Engine (L1 Wiki Fast Memory + L2 Vector RAG) */}
-      {activeSubTab === "hybrid_engine" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <h3 className="text-xl font-bold text-white">Hybrid Query Engine: L1 Wiki Cache + L2 Vector RAG</h3>
-            <p className="text-xs text-slate-400">
-              Following Andrej Karpathy's LLM Second Brain architecture, 961AINetwork solves latency and hallucination through dual-layer retrieval.
+            <p className="text-[11px] text-slate-700 font-sans line-clamp-2 leading-relaxed">
+              {hoveredNode.title || hoveredNode.bio || "Active participant in the Lebanese AI ecosystem."}
             </p>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-            {/* L1 Wiki Cache Box */}
-            <div className="p-5 bg-gradient-to-b from-emerald-950/40 to-slate-950 border border-emerald-500/30 rounded-2xl space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-mono text-xs font-bold border border-emerald-500/30">
-                  LAYER 1: PRE-COMPILED WIKI
-                </span>
-                <span className="font-mono text-xs text-emerald-400 font-bold">~0.8ms Latency</span>
-              </div>
-              <h4 className="text-base font-bold text-white">Fast L1 Knowledge Memory</h4>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Clean, authoritative Markdown documents compiled and maintained by AI daemons. Includes structured frontmatter and explicit <code className="text-emerald-400 font-mono">[[Wikilinks]]</code> for instant graph traversal.
-              </p>
-              <ul className="text-xs text-slate-400 space-y-1.5 font-mono">
-                <li>✓ Zero embedding compute cost for common queries</li>
-                <li>✓ Deterministic bidirectional relationship lookups</li>
-                <li>✓ Ultra-lightweight for WhatsApp/Telegram edge bots</li>
-              </ul>
-            </div>
-
-            {/* L2 Vector Storage Box */}
-            <div className="p-5 bg-gradient-to-b from-indigo-950/40 to-slate-950 border border-indigo-500/30 rounded-2xl space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-1 rounded bg-indigo-500/20 text-indigo-300 font-mono text-xs font-bold border border-indigo-500/30">
-                  LAYER 2: VECTOR EMBEDDINGS
-                </span>
-                <span className="font-mono text-xs text-indigo-400 font-bold">~320ms Latency</span>
-              </div>
-              <h4 className="text-base font-bold text-white">Deep Document Vector RAG</h4>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Handles heavy raw attachments (50-page pitch decks, technical whitepapers, GitHub code commit diffs). Invoked on-demand when L1 Wiki queries require deep clause extraction.
-              </p>
-              <ul className="text-xs text-slate-400 space-y-1.5 font-mono">
-                <li>✓ pgvector with HNSW index in PostgreSQL</li>
-                <li>✓ Multi-vector cosine similarity across technical domains</li>
-                <li>✓ Async synchronization with Neo4j entity nodes</li>
-              </ul>
+            <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+              <span>📍 {hoveredNode.location || "Lebanon"}</span>
+              <span className="font-bold text-[#2E5A2C]">Click node to inspect ↗</span>
             </div>
           </div>
+        )}
 
-          {/* Flow Diagram Representation */}
-          <div className="p-5 bg-slate-950 border border-slate-800 rounded-2xl text-center space-y-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Query Resolution Flow</span>
-            <div className="flex flex-wrap items-center justify-center gap-3 font-mono text-xs">
-              <div className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200">
-                User Query (Web / WhatsApp)
-              </div>
-              <span className="text-slate-600">➔</span>
-              <div className="px-3 py-2 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-emerald-300 font-bold">
-                L1 Wiki Match Hit? (92% queries)
-              </div>
-              <span className="text-slate-600">➔</span>
-              <div className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200">
-                Instant Sub-ms Markdown Response
-              </div>
+        {/* Hovered Link Tooltip Card */}
+        {hoveredLink && !hoveredNode && (
+          <div className="absolute bottom-4 left-4 z-10 bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-mono shadow-md flex items-center gap-2">
+            <span className="text-[#75AC73] font-bold">RELATIONSHIP:</span>
+            <span>{hoveredLink.relationship.replace(/_/g, " ")}</span>
+            <span className="text-[10px] opacity-75">({Math.round(hoveredLink.weight * 100)}% strength)</span>
+          </div>
+        )}
+
+        {/* D3 SVG Canvas */}
+        <svg
+          ref={svgRef}
+          width={dimensions.width}
+          height={dimensions.height}
+          className="w-full h-auto block select-none"
+        />
+
+        {/* Visual Map Legend Footer */}
+        <div className="border-t border-[#D7E7D6] bg-white p-3 flex flex-wrap items-center justify-between gap-3 text-[11px]">
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="font-bold text-slate-700">Map Legend:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-[#EBF3EA] border border-[#4D7D4B]"></span>
+              <span className="text-slate-800 font-medium">Startups & Scaleups</span>
             </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-[#EFF6FF] border border-[#3B82F6]"></span>
+              <span className="text-slate-800 font-medium">Regional VCs & Angels</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-[#FAF5FF] border border-[#A855F7]"></span>
+              <span className="text-slate-800 font-medium">Diaspora Gurus & Scientists</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-[#FEF3C7] border border-[#F59E0B]"></span>
+              <span className="text-slate-800 font-medium">Accelerators & Universities</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-slate-500">
+            <span>💡 Drag nodes to isolate clusters • Scroll to zoom • Click to view dossier</span>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Node Mini Highlights Grid (3 Columns) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
+        <div className="p-3.5 bg-[#F6FAF5] rounded-xl border border-[#D7E7D6] space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-[#2E5A2C]">
+            <span className="flex items-center gap-1">
+              <span>🚀</span>
+              <span>Top AI Scaleups</span>
+            </span>
+            <span>{stats.startupsCount} Entities</span>
+          </div>
+          <p className="text-[11px] text-slate-600 font-sans">
+            CedarsLLM, Phoenicia Vision, Beirut NeuroTech, MedLevant, and LevantVoice deploying Arabic frontier AI.
+          </p>
+        </div>
+
+        <div className="p-3.5 bg-[#EFF6FF]/60 rounded-xl border border-blue-200 space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-blue-900">
+            <span className="flex items-center gap-1">
+              <span>💼</span>
+              <span>Venture Capital Pipelines</span>
+            </span>
+            <span>{stats.investorsCount} Funds</span>
+          </div>
+          <p className="text-[11px] text-slate-600 font-sans">
+            Cedar AI Syndicate, LebNet SV Angels, MEVP ($300M AUM), Phoenician Fund, and IM Capital matching facilities.
+          </p>
+        </div>
+
+        <div className="p-3.5 bg-[#FAF5FF]/60 rounded-xl border border-purple-200 space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-purple-900">
+            <span className="flex items-center gap-1">
+              <span>✈️</span>
+              <span>Diaspora Mentorship Bridge</span>
+            </span>
+            <span>{stats.diasporaCount} Leaders</span>
+          </div>
+          <p className="text-[11px] text-slate-600 font-sans">
+            Senior scientists at Anthropic, Meta FAIR, Mistral AI, MIT Media Lab, and Stanford advising onshore founders.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,802 +1,441 @@
-import React, { useState, useEffect } from "react";
-import { UserAuthSession, UserRole } from "../types";
-import { addSubscriberToMailingList } from "../lib/mailingList";
-import { addTrialUser, addMailingListRegistration } from "../lib/registeredUsers";
-import { provisionZ961Workspace } from "../lib/z961SecondBrainService";
+import React, { useState } from "react";
 import { 
-  X, 
-  Sparkles, 
-  Lock, 
-  Mail, 
-  User, 
+  Briefcase, 
+  MapPin, 
   Building2, 
-  Clock, 
+  DollarSign, 
+  ExternalLink, 
+  Calendar, 
+  Sparkles, 
   CheckCircle2, 
-  ShieldCheck, 
-  Crown, 
-  ArrowRight,
-  Zap,
-  Eye, 
-  EyeOff, 
-  Phone, 
-  Brain,
-  Compass,
-  Check
+  Clock, 
+  Award,
+  Filter,
+  Send,
+  UserCheck,
+  ChevronRight,
+  GraduationCap
 } from "lucide-react";
 
-interface AuthModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onAuthSuccess: (session: UserAuthSession, isSignUp?: boolean) => void;
-  initialMode?: "signin" | "signup";
-  onNavigateToPricing?: () => void;
-  accessReason?: string;
-  onContinueBrowsing?: () => void;
+export interface EcosystemJob {
+  id: string;
+  title: string;
+  companyName: string;
+  companyLogo?: string;
+  companySlug?: string;
+  location: string;
+  type: "Full-Time" | "Part-Time" | "Remote (Lebanon)" | "Advisory / Fellowship";
+  category: "LLM & NLP" | "Computer Vision" | "MLOps & Infra" | "Full-Stack AI" | "AI Product & Growth";
+  salaryRangeUsd: string;
+  postedAt: string;
+  experienceLevel: "Junior / Fresh Grad" | "Mid-Level (2-4 yrs)" | "Senior / Lead (5+ yrs)" | "Research Fellow";
+  universityPartner?: string;
+  description: string;
+  requirements: string[];
+  techStack: string[];
+  applyEmailOrUrl: string;
 }
 
-interface StoredAccount {
-  email: string;
-  passwordHash: string; // Stored user password
+export interface GrantDeadline {
+  id: string;
   name: string;
-  role: UserRole;
-  affiliation: string;
-  session: UserAuthSession;
+  provider: string;
+  grantSize: string;
+  deadline: string;
+  daysRemaining: number;
+  stageEligibility: "Ideation / Student" | "Pre-Seed / Prototype" | "Early Growth / Seed" | "Academic R&D";
+  focus: string;
+  lebanonEligible: boolean;
+  status: "Open" | "Closing Soon" | "Rolling";
+  applyUrl: string;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({
-  isOpen,
-  onClose,
-  onAuthSuccess,
-  initialMode = "signup",
-  onNavigateToPricing,
-  accessReason,
-  onContinueBrowsing
-}) => {
-  const [mode, setMode] = useState<"signin" | "signup">(initialMode);
-  
-  // Update mode when initialMode changes or modal opens
-  useEffect(() => {
-    setMode(initialMode);
-  }, [initialMode, isOpen]);
+export const INITIAL_ECOSYSTEM_JOBS: EcosystemJob[] = [
+  {
+    id: "job_1",
+    title: "Arabic Foundation Model Research Engineer",
+    companyName: "CedarsLLM Core Lab",
+    location: "Beirut Onshore (Downtown R&D Lab) / Hybrid",
+    type: "Full-Time",
+    category: "LLM & NLP",
+    salaryRangeUsd: "$4,500 - $7,000 / mo (Fresh USD)",
+    postedAt: "2026-08-25",
+    experienceLevel: "Senior / Lead (5+ yrs)",
+    universityPartner: "AUB / LAU Computer Science Alumni Preferred",
+    description: "Lead pre-training and DPO alignment pipelines for 14B & 70B Arabic dialect mixture-of-experts models on dedicated Lebanese GPU clusters.",
+    requirements: [
+      "Deep experience with PyTorch, Megatron-LM, FlashAttention-3",
+      "Proven track record training Arabic NLP tokenizers & dialectal benchmark datasets",
+      "M.Sc. or Ph.D. in Computer Science, Machine Learning, or related field"
+    ],
+    techStack: ["PyTorch", "vLLM", "CUDA", "Triton", "HuggingFace"],
+    applyEmailOrUrl: "mailto:careers@cedarsllm.ai"
+  },
+  {
+    id: "job_2",
+    title: "Computer Vision & Edge Inference Specialist",
+    companyName: "Phoenicia Vision Systems",
+    location: "Tripoli Technopark / Remote",
+    type: "Full-Time",
+    category: "Computer Vision",
+    salaryRangeUsd: "$3,200 - $5,000 / mo (Fresh USD)",
+    postedAt: "2026-08-24",
+    experienceLevel: "Mid-Level (2-4 yrs)",
+    universityPartner: "Balamand / USJ Alumni Preferred",
+    description: "Design low-power YOLOv11 and TensorRT edge perception algorithms for autonomous solar drone inspections across MENA arid environments.",
+    requirements: [
+      "2+ years deploying computer vision models to NVIDIA Jetson & Raspberry Pi edge units",
+      "Strong proficiency in C++, Python, OpenCV, and TensorRT quantization",
+      "Experience with synthetic data generation and active learning"
+    ],
+    techStack: ["TensorRT", "C++", "Python", "OpenCV", "Jetson Orin"],
+    applyEmailOrUrl: "mailto:jobs@phoeniciavision.com"
+  },
+  {
+    id: "job_3",
+    title: "Full-Stack AI Application Architect",
+    companyName: "MedLevant Diagnostics AI",
+    location: "Beirut (Badaro Tech Cluster)",
+    type: "Full-Time",
+    category: "Full-Stack AI",
+    salaryRangeUsd: "$3,500 - $5,500 / mo + Equity",
+    postedAt: "2026-08-22",
+    experienceLevel: "Mid-Level (2-4 yrs)",
+    description: "Build clinical-grade diagnostic web platforms integrating radiology PACS feeds with HIPAA/GDPR compliant inference microservices.",
+    requirements: [
+      "Expertise in TypeScript, React, Next.js, FastAPI, and PostgreSQL with pgvector",
+      "Understanding of medical DICOM formats and encrypted edge telemetry",
+      "Passion for building life-saving healthcare infrastructure in the Levant"
+    ],
+    techStack: ["Next.js", "FastAPI", "PostgreSQL", "pgvector", "Docker"],
+    applyEmailOrUrl: "mailto:talent@medlevant.ai"
+  },
+  {
+    id: "job_4",
+    title: "Junior MLOps & Autonomous Agent Engineer",
+    companyName: "CedarMind Technologies",
+    location: "Beirut Onshore / Remote Lebanon",
+    type: "Full-Time",
+    category: "MLOps & Infra",
+    salaryRangeUsd: "$2,200 - $3,200 / mo (Fresh USD)",
+    postedAt: "2026-08-20",
+    experienceLevel: "Junior / Fresh Grad",
+    universityPartner: "Open to 2025/2026 Lebanese University & AUB/LAU Graduates",
+    description: "Maintain CI/CD continuous evaluation pipelines for autonomous procurement agents deployed across GCC enterprise supply chains.",
+    requirements: [
+      "Solid understanding of Kubernetes, Docker, LangGraph, and automated model testing",
+      "Strong problem-solving fundamentals and clean Python coding practices",
+      "Eager to learn high-throughput LLM routing and prompt caching architectures"
+    ],
+    techStack: ["Kubernetes", "Docker", "LangGraph", "FastAPI", "Redis"],
+    applyEmailOrUrl: "mailto:apply@cedarmind.ai"
+  }
+];
 
-  // Handle ESC key to dismiss modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        handleDismiss();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
-  
-  // Sign Up & Sign In Form States
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<UserRole>("founder");
-  const [affiliation, setAffiliation] = useState("");
-  const [whatsappPhone, setWhatsappPhone] = useState("+961 70 247 961");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export const INITIAL_GRANT_DEADLINES: GrantDeadline[] = [
+  {
+    id: "grant_1",
+    name: "Berytech ACT Smart Innovation Grant",
+    provider: "Berytech / Kingdom of the Netherlands",
+    grantSize: "$25,000 - $60,000 Equity-Free",
+    deadline: "2026-09-15",
+    daysRemaining: 19,
+    stageEligibility: "Pre-Seed / Prototype",
+    focus: "AgriTech, CleanTech & Environmental AI Startups in Lebanon",
+    lebanonEligible: true,
+    status: "Closing Soon",
+    applyUrl: "https://berytech.org"
+  },
+  {
+    id: "grant_2",
+    name: "USAID TIF Tech Export Matching Facility",
+    provider: "USAID Trade & Investment Facilitation",
+    grantSize: "$50,000 - $150,000 Co-Financing",
+    deadline: "2026-10-01",
+    daysRemaining: 35,
+    stageEligibility: "Early Growth / Seed",
+    focus: "Lebanese AI & Software Exporters Scaling to GCC & US Markets",
+    lebanonEligible: true,
+    status: "Open",
+    applyUrl: "https://tif-lebanon.com"
+  },
+  {
+    id: "grant_3",
+    name: "EU Horizon Europe DeepTech Levant Sandbox",
+    provider: "European Innovation Council",
+    grantSize: "€100,000 - €250,000 Research Grant",
+    deadline: "2026-10-30",
+    daysRemaining: 64,
+    stageEligibility: "Academic R&D",
+    focus: "AUB, LAU, USJ, LU Joint AI Research Partnerships with European Labs",
+    lebanonEligible: true,
+    status: "Open",
+    applyUrl: "https://eic.ec.europa.eu"
+  },
+  {
+    id: "grant_4",
+    name: "QSTP MENA AI Catalyst Fund",
+    provider: "Qatar Science & Technology Park",
+    grantSize: "$100,000 Non-Dilutive + Compute Credits",
+    deadline: "2026-11-15",
+    daysRemaining: 80,
+    stageEligibility: "Early Growth / Seed",
+    focus: "Arabic Language AI, Medical Diagnostics & Renewable Grid AI",
+    lebanonEligible: true,
+    status: "Open",
+    applyUrl: "https://qstp.org.qa"
+  }
+];
 
-  if (!isOpen) return null;
+export const EcosystemTalentAndGrantsTab: React.FC = () => {
+  const [activeSubView, setActiveSubView] = useState<"jobs" | "grants">("jobs");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedExp, setSelectedExp] = useState<string>("all");
+  const [appliedJobId, setAppliedJobId] = useState<string | null>(null);
 
-  // Helper to record guest browsing dismissal
-  const handleDismiss = () => {
-    try {
-      sessionStorage.setItem("961ai_guest_browsing", "true");
-    } catch {
-      // ignore
-    }
-    if (onContinueBrowsing) {
-      onContinueBrowsing();
-    } else {
-      onClose();
-    }
-  };
-
-  // Helper to get registered accounts
-  const getRegisteredAccounts = (): StoredAccount[] => {
-    try {
-      const data = localStorage.getItem("961ai_registered_users");
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanName = name.trim();
-    const cleanPass = password.trim();
-    const cleanPhone = whatsappPhone.trim() || "+961 70 247 961";
-
-    if (!cleanEmail || !cleanPass || !cleanName) {
-      setErrorMsg("Please fill in your name, email, and a password.");
-      return;
-    }
-
-    if (cleanPass.length < 4) {
-      setErrorMsg("Password must be at least 4 characters long.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrorMsg(null);
-
-    const now = Date.now();
-    // 6-Hour Demo Usage timestamp
-    const sixHoursMs = 6 * 60 * 60 * 1000;
-    const demoExpiresAt = now + sixHoursMs;
-
-    // Auto-provision personal z961 Second Brain Workspace
-    let workspaceId = `z961_ws_${cleanEmail.replace(/[^a-z0-9]/gi, "_")}`;
-    let starterCount = 6;
-    try {
-      const ws = await provisionZ961Workspace({
-        id: `usr_${Date.now()}`,
-        name: cleanName,
-        email: cleanEmail,
-        role: role,
-        affiliation: affiliation.trim() || "Independent Tech Leader",
-        whatsappPhone: cleanPhone
-      });
-      workspaceId = ws.id;
-      starterCount = ws.starterAssetsCount || 6;
-    } catch (wsErr) {
-      console.warn("Second brain auto-provisioning handled locally:", wsErr);
-    }
-
-    const newSession: UserAuthSession = {
-      id: `usr_${Date.now()}`,
-      email: cleanEmail,
-      name: cleanName,
-      role: role,
-      affiliation: affiliation.trim() || "Independent Tech Leader",
-      createdAt: now,
-      demoExpiresAt: demoExpiresAt,
-      isPremium: false,
-      plan: "demo",
-      credits: 50,
-      z961_second_brain_id: workspaceId,
-      whatsapp_phone: cleanPhone,
-      ingested_sources_count: starterCount
-    };
-
-    // Save account in registered users array
-    const accounts = getRegisteredAccounts();
-    const existingIndex = accounts.findIndex(a => a.email === cleanEmail);
-
-    const newAccount: StoredAccount = {
-      email: cleanEmail,
-      passwordHash: cleanPass,
-      name: cleanName,
-      role: role,
-      affiliation: affiliation.trim() || "Independent Tech Leader",
-      session: newSession
-    };
-
-    if (existingIndex >= 0) {
-      accounts[existingIndex] = newAccount;
-    } else {
-      accounts.push(newAccount);
-    }
-
-    localStorage.setItem("961ai_registered_users", JSON.stringify(accounts));
-    localStorage.setItem("961ai_auth_user", JSON.stringify(newSession));
-
-    // Register user in the Admin Mailing List & Subscriber Repository (GDPR Opt-In)
-    try {
-      addSubscriberToMailingList(
-        cleanEmail,
-        cleanName,
-        role === "founder" ? "Founder" : role === "investor" ? "Investor" : role === "guru" ? "AI Guru" : "Superadmin",
-        "Signup & Demo",
-        affiliation.trim() || "Al Khawarizmi Solutions & NCEI Joint Platform",
-        `Free Registered Account. Access intent: ${accessReason || "Complete Ecosystem Access"}`
-      );
-
-      // Register in Trial User CRM
-      addTrialUser({
-        email: cleanEmail,
-        name: cleanName,
-        role: role === "founder" ? "Founder" : role === "investor" ? "Investor" : role === "guru" ? "AI Guru" : "Superadmin",
-        affiliation: affiliation.trim() || "Independent Tech Leader",
-        whatsappPhone: cleanPhone,
-        demoExpiresAt: demoExpiresAt,
-        credits: 50,
-        secondBrainId: workspaceId,
-        notes: `Registered Free Demo Account. Access intent: ${accessReason || "Complete Ecosystem Access"}`
-      });
-
-      // Also register on mailing list if opt-in
-      addMailingListRegistration(
-        cleanEmail,
-        cleanName,
-        role === "founder" ? "Founder" : role === "investor" ? "Investor" : role === "guru" ? "AI Guru" : "Superadmin",
-        affiliation.trim() || "Al Khawarizmi Solutions & NCEI Joint Platform",
-        "Free Account Registration",
-        `Opted in during account signup. Intent: ${accessReason || "Ecosystem Access"}`
-      );
-    } catch {
-      // ignore
-    }
-
-    setSuccessMsg(`Welcome, ${cleanName}! Your free account is active and Second Brain is provisioned.`);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      onAuthSuccess(newSession, true);
-      onClose();
-    }, 700);
-  };
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanPass = password.trim();
-
-    if (!cleanEmail) {
-      setErrorMsg("Please enter your email address.");
-      return;
-    }
-
-    if (!cleanPass) {
-      setErrorMsg("Please enter your password.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrorMsg(null);
-
-    const accounts = getRegisteredAccounts();
-    const matchedAccount = accounts.find(a => a.email === cleanEmail);
-
-    let sessionToUse: UserAuthSession;
-
-    if (matchedAccount) {
-      // Check password
-      if (matchedAccount.passwordHash && matchedAccount.passwordHash !== cleanPass) {
-        setIsSubmitting(false);
-        setErrorMsg("Incorrect password for this account. Please verify and try again.");
-        return;
-      }
-      sessionToUse = matchedAccount.session;
-    } else {
-      // Check current session storage
-      const saved = localStorage.getItem("961ai_auth_user");
-      if (saved) {
-        const parsed = JSON.parse(saved) as UserAuthSession;
-        if (parsed.email.toLowerCase() === cleanEmail) {
-          sessionToUse = parsed;
-        } else {
-          // Create new session for this user
-          const now = Date.now();
-          sessionToUse = {
-            id: `usr_${Date.now()}`,
-            email: cleanEmail,
-            name: name.trim() || cleanEmail.split("@")[0],
-            role: role,
-            affiliation: affiliation.trim() || "Lebanese AI Network Member",
-            createdAt: now,
-            demoExpiresAt: now + 6 * 60 * 60 * 1000,
-            isPremium: false,
-            plan: "demo",
-            credits: 50
-          };
-        }
-      } else {
-        const now = Date.now();
-        sessionToUse = {
-          id: `usr_${Date.now()}`,
-          email: cleanEmail,
-          name: name.trim() || cleanEmail.split("@")[0],
-          role: role,
-          affiliation: affiliation.trim() || "Lebanese AI Network Member",
-          createdAt: now,
-          demoExpiresAt: now + 6 * 60 * 60 * 1000,
-          isPremium: false,
-          plan: "demo",
-          credits: 50
-        };
-      }
-
-      // Register this account
-      accounts.push({
-        email: cleanEmail,
-        passwordHash: cleanPass,
-        name: sessionToUse.name,
-        role: sessionToUse.role,
-        affiliation: sessionToUse.affiliation,
-        session: sessionToUse
-      });
-      localStorage.setItem("961ai_registered_users", JSON.stringify(accounts));
-    }
-
-    // Ensure workspace is provisioned or loaded
-    try {
-      const ws = await provisionZ961Workspace({
-        id: sessionToUse.id,
-        name: sessionToUse.name,
-        email: sessionToUse.email,
-        role: sessionToUse.role,
-        affiliation: sessionToUse.affiliation,
-        whatsappPhone: sessionToUse.whatsapp_phone || "+961 70 247 961"
-      });
-      sessionToUse.z961_second_brain_id = ws.id;
-      sessionToUse.whatsapp_phone = ws.whatsappPhone || "+961 70 247 961";
-      sessionToUse.ingested_sources_count = ws.ingestedSourcesCount || ws.starterAssetsCount || 6;
-    } catch {
-      if (!sessionToUse.z961_second_brain_id) {
-        sessionToUse.z961_second_brain_id = `z961_ws_${sessionToUse.id}`;
-      }
-    }
-
-    localStorage.setItem("961ai_auth_user", JSON.stringify(sessionToUse));
-    setSuccessMsg(`Signed in successfully as ${sessionToUse.name}!`);
-
-    setTimeout(() => {
-      setIsSubmitting(false);
-      onAuthSuccess(sessionToUse);
-      onClose();
-    }, 500);
-  };
-
-  // 1-Click Quick Demo Switchers
-  const handleQuickLogin = (type: "demo_active" | "pro_annual" | "expired_demo") => {
-    const now = Date.now();
-    let session: UserAuthSession;
-
-    if (type === "demo_active") {
-      session = {
-        id: "demo_usr_01",
-        name: "Maan Barazy",
-        email: "maan.barazy@961ai.network",
-        role: "founder",
-        affiliation: "CedarScale AI Lab",
-        createdAt: now,
-        demoExpiresAt: now + (5 * 3600 + 45 * 60) * 1000,
-        isPremium: false,
-        plan: "demo",
-        credits: 50,
-        z961_second_brain_id: "z961_ws_maan_barazy",
-        whatsapp_phone: "+961 70 247 961",
-        ingested_sources_count: 6
-      };
-    } else if (type === "pro_annual") {
-      session = {
-        id: "pro_usr_01",
-        name: "Maya Haddad",
-        email: "maya.haddad@cedarvc.com",
-        role: "investor",
-        affiliation: "Cedar Syndicate Partners",
-        createdAt: now - 30 * 86400 * 1000,
-        demoExpiresAt: now - 20 * 86400 * 1000,
-        isPremium: true,
-        premiumExpiresAt: now + 335 * 86400 * 1000,
-        plan: "premium_annual",
-        credits: 2500,
-        z961_second_brain_id: "z961_ws_maya_haddad",
-        whatsapp_phone: "+1 415 961 8820",
-        ingested_sources_count: 14
-      };
-    } else {
-      session = {
-        id: "expired_usr_01",
-        name: "Tarek Saliba",
-        email: "tarek@diaspora-dev.org",
-        role: "guru",
-        affiliation: "Ex-AUB AI Fellow",
-        createdAt: now - 7 * 3600 * 1000,
-        demoExpiresAt: now - 1 * 3600 * 1000,
-        isPremium: false,
-        plan: "demo",
-        credits: 0,
-        z961_second_brain_id: "z961_ws_tarek_saliba",
-        whatsapp_phone: "+33 6 42 96 10 24",
-        ingested_sources_count: 6
-      };
-    }
-
-    localStorage.setItem("961ai_auth_user", JSON.stringify(session));
-    onAuthSuccess(session);
-    onClose();
-  };
+  const filteredJobs = INITIAL_ECOSYSTEM_JOBS.filter((job) => {
+    const matchCat = selectedCategory === "all" || job.category === selectedCategory;
+    const matchExp = selectedExp === "all" || job.experienceLevel === selectedExp;
+    return matchCat && matchExp;
+  });
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          handleDismiss();
-        }
-      }}
-    >
-      {/* Landscape Container: max-w-4xl, side-by-side on desktop */}
-      <div 
-        className="bg-white border-2 border-[#FDE68A] rounded-2xl max-w-4xl w-full shadow-2xl relative overflow-hidden font-sans flex flex-col md:flex-row max-h-[92vh] md:max-h-[85vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Mobile / Universal Top Close Button */}
-        <button
-          onClick={handleDismiss}
-          className="absolute top-3.5 right-3.5 z-20 text-slate-400 hover:text-slate-800 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer bg-white/80 backdrop-blur-xs shadow-xs"
-          title="Close / Dismiss"
-          aria-label="Close dialog"
-        >
-          <X className="w-5 h-5" />
-        </button>
+    <div className="space-y-6 animate-in fade-in duration-150 font-mono">
+      {/* View Switcher Sub-Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border-2 border-[#D7E7D6]">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveSubView("jobs")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+              activeSubView === "jobs"
+                ? "bg-[#4D7D4B] text-white shadow-xs"
+                : "bg-[#F6FAF5] hover:bg-[#EBF3EA] text-[#000000] border border-[#D7E7D6]"
+            }`}
+          >
+            <Briefcase className="w-4 h-4" />
+            <span>Lebanese AI Talent & Job Board ({INITIAL_ECOSYSTEM_JOBS.length})</span>
+          </button>
 
-        {/* LEFT COLUMN (Landscape Hero & Perks & Fast Profiles) */}
-        <div className="md:w-5/12 bg-gradient-to-br from-[#1A1811] via-[#242116] to-[#2E2A1C] text-white p-5 sm:p-6 flex flex-col justify-between border-b md:border-b-0 md:border-r border-[#423C26] relative overflow-hidden shrink-0">
-          {/* Subtle Cedar Watermark */}
-          <div className="absolute -right-8 -bottom-8 opacity-10 text-9xl select-none pointer-events-none">
-            🌲
-          </div>
-
-          <div className="space-y-4 relative z-10">
-            {/* Header Badge */}
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-300 bg-white/10 px-2.5 py-0.5 rounded-full border border-white/20 flex items-center gap-1.5">
-                <span>🌲</span>
-                <span>961AI Sovereign Ecosystem</span>
-              </span>
-            </div>
-
-            <div className="space-y-1">
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
-                Lebanon AI Intelligence & Knowledge Engine
-              </h2>
-              <p className="text-xs text-amber-100/90 leading-relaxed">
-                Connect with 120+ verified entities, explore sovereign regulatory tools, and unlock your personal Second Brain.
-              </p>
-            </div>
-
-            {/* Perks Bullet List */}
-            <div className="space-y-2.5 pt-1 text-xs">
-              <div className="flex items-start gap-2.5 text-amber-50">
-                <div className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
-                  <Brain className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <strong className="text-white block text-[11px]">z961 Second Brain Workspace</strong>
-                  <span className="text-[11px] text-amber-100/80">NotebookLM-style grounded AI copilot & podcast audio studio.</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5 text-amber-50">
-                <div className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <strong className="text-white block text-[11px]">Verified Directory & Law 126 Sandbox</strong>
-                  <span className="text-[11px] text-amber-100/80">0% Offshore S.A.L., BDL Circular 165, and VC terms.</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5 text-amber-50">
-                <div className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
-                  <Mail className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <strong className="text-white block text-[11px]">100% Free • Community Mailing List</strong>
-                  <span className="text-[11px] text-amber-100/80">Co-developed by NCEI Lebanon & Alkharizmi Solutions.</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Fast 1-Click Preview Logins at Bottom of Left Column */}
-          <div className="pt-4 mt-4 border-t border-amber-700/40 relative z-10 space-y-1.5">
-            <div className="flex items-center justify-between text-[10px] font-mono text-amber-200">
-              <span className="uppercase tracking-wider font-bold">Fast 1-Click Demo Profiles:</span>
-              {onNavigateToPricing && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onNavigateToPricing();
-                  }}
-                  className="text-amber-300 hover:underline flex items-center gap-1 text-[10px]"
-                >
-                  <Crown className="w-2.5 h-2.5" />
-                  <span>$100/yr Pro</span>
-                </button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-3 gap-1.5 text-[10px]">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("demo_active")}
-                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/15 text-left transition-colors cursor-pointer text-white"
-                title="Active 6-hour demo session"
-              >
-                <span className="font-bold block truncate text-[10px]">⚡ Maan</span>
-                <span className="text-[9px] text-amber-200 font-mono">6-Hour Demo</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("pro_annual")}
-                className="p-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 border border-amber-300/30 text-left transition-colors cursor-pointer text-amber-100"
-                title="Pro annual subscriber session"
-              >
-                <span className="font-bold block truncate text-[10px]">👑 Maya</span>
-                <span className="text-[9px] text-amber-200 font-mono">Investor</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("expired_demo")}
-                className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-300/30 text-left transition-colors cursor-pointer text-rose-100"
-                title="Simulate expired demo state"
-              >
-                <span className="font-bold block truncate text-[10px]">⏳ Tarek</span>
-                <span className="text-[9px] text-rose-200 font-mono">Expired</span>
-              </button>
-            </div>
-          </div>
+          <button
+            onClick={() => setActiveSubView("grants")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+              activeSubView === "grants"
+                ? "bg-[#4D7D4B] text-white shadow-xs"
+                : "bg-[#F6FAF5] hover:bg-[#EBF3EA] text-[#000000] border border-[#D7E7D6]"
+            }`}
+          >
+            <Award className="w-4 h-4" />
+            <span>Open Non-Dilutive Grants Tracker ({INITIAL_GRANT_DEADLINES.length})</span>
+          </button>
         </div>
 
-        {/* RIGHT COLUMN (Form, Mode Switcher, and Browsing Option) */}
-        <div className="md:w-7/12 p-5 sm:p-6 flex flex-col justify-between overflow-y-auto bg-white">
-          <div className="space-y-3">
-            {/* Top Bar: Tabs Switcher */}
-            <div className="flex items-center justify-between gap-3 pr-8">
-              <div className="inline-flex p-0.5 bg-[#FFFDF0] border border-[#FDE68A] rounded-xl text-xs font-bold font-mono">
-                <button
-                  type="button"
-                  onClick={() => { setMode("signup"); setErrorMsg(null); setSuccessMsg(null); }}
-                  className={`px-3 py-1.5 rounded-lg transition-all text-xs cursor-pointer ${
-                    mode === "signup"
-                      ? "bg-black text-white font-bold shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  Free Sign Up
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setMode("signin"); setErrorMsg(null); setSuccessMsg(null); }}
-                  className={`px-3 py-1.5 rounded-lg transition-all text-xs cursor-pointer ${
-                    mode === "signin"
-                      ? "bg-black text-white font-bold shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  Sign In
-                </button>
-              </div>
-
-              <span className="text-[10px] font-mono text-[#B45309] bg-[#FFFBEA] px-2 py-0.5 rounded-md border border-[#FDE68A] hidden sm:inline-block">
-                100% Free Community
-              </span>
-            </div>
-
-            {/* Access Reason Banner if triggered by a specific action */}
-            {accessReason && (
-              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2 text-xs text-emerald-950">
-                <Lock className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-emerald-800 leading-snug">
-                  Create a free account or sign in to unlock <strong>{accessReason}</strong>.
-                </p>
-              </div>
-            )}
-
-            {/* Auth Form */}
-            <form onSubmit={mode === "signup" ? handleSignUp : handleSignIn} className="space-y-2.5">
-              {mode === "signup" ? (
-                <>
-                  {/* Row 1: Name and Email */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700 font-mono">Full Name</label>
-                      <div className="relative">
-                        <User className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Ziad Mansour"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          className="w-full bg-[#F6FAF5] border border-[#D7E7D6] focus:border-[#4D7D4B] rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-900 font-medium focus:outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700 font-mono">Email Address</label>
-                      <div className="relative">
-                        <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                        <input
-                          type="email"
-                          required
-                          placeholder="name@organization.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full bg-[#F6FAF5] border border-[#D7E7D6] focus:border-[#4D7D4B] rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-900 font-medium focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Row 2: Password and Role */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-slate-700 font-mono">Password</label>
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="text-[10px] text-slate-500 hover:text-slate-700 flex items-center gap-1 cursor-pointer"
-                        >
-                          {showPassword ? <EyeOff className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
-                          <span>{showPassword ? "Hide" : "Show"}</span>
-                        </button>
-                      </div>
-                      <div className="relative">
-                        <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          required
-                          placeholder="••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="w-full bg-[#F6FAF5] border border-[#D7E7D6] focus:border-[#4D7D4B] rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-900 font-medium focus:outline-none font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700 font-mono">Ecosystem Role</label>
-                      <select
-                        value={role}
-                        onChange={(e) => setRole(e.target.value as UserRole)}
-                        className="w-full bg-[#F6FAF5] border border-[#D7E7D6] focus:border-[#4D7D4B] rounded-lg px-2.5 py-1.5 text-xs text-slate-900 font-medium focus:outline-none"
-                      >
-                        <option value="founder">Founder / Startup</option>
-                        <option value="investor">VC / Angel Investor</option>
-                        <option value="guru">AI Guru / Researcher</option>
-                        <option value="superadmin">Agency / Partner</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Row 3: Organization and WhatsApp Phone */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700 font-mono">Organization / Firm</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Cedar Labs"
-                        value={affiliation}
-                        onChange={(e) => setAffiliation(e.target.value)}
-                        className="w-full bg-[#F6FAF5] border border-[#D7E7D6] focus:border-[#4D7D4B] rounded-lg px-2.5 py-1.5 text-xs text-slate-900 font-medium focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-slate-700 font-mono flex items-center gap-1">
-                          <Phone className="w-3 h-3 text-emerald-600" />
-                          <span>WhatsApp (Second Brain Sync)</span>
-                        </label>
-                      </div>
-                      <input
-                        type="tel"
-                        placeholder="+961 70 247 961"
-                        value={whatsappPhone}
-                        onChange={(e) => setWhatsappPhone(e.target.value)}
-                        className="w-full bg-[#F6FAF5] border border-[#D7E7D6] focus:border-[#4D7D4B] rounded-lg px-2.5 py-1.5 text-xs text-slate-900 font-mono focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Sign In Inputs */}
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 font-mono">Email Address</label>
-                    <div className="relative">
-                      <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                      <input
-                        type="email"
-                        required
-                        placeholder="name@organization.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-[#F6FAF5] border border-[#D7E7D6] focus:border-[#4D7D4B] rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-900 font-medium focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-slate-700 font-mono">Password</label>
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="text-[10px] text-slate-500 hover:text-slate-700 flex items-center gap-1 cursor-pointer"
-                      >
-                        {showPassword ? <EyeOff className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
-                        <span>{showPassword ? "Hide" : "Show"}</span>
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        required
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-[#F6FAF5] border border-[#D7E7D6] focus:border-[#4D7D4B] rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-900 font-medium focus:outline-none font-mono"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {errorMsg && (
-                <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-mono">
-                  {errorMsg}
-                </div>
-              )}
-
-              {successMsg && (
-                <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-mono flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>{successMsg}</span>
-                </div>
-              )}
-
-              {/* Primary Submit Button */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-2 px-4 rounded-xl bg-black hover:bg-neutral-800 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer mt-1"
-              >
-                {mode === "signup" ? (
-                  <>
-                    <Zap className="w-3.5 h-3.5 text-white" />
-                    <span className="text-white font-bold">{isSubmitting ? "Creating Account..." : "Sign Up Free & Unlock Access"}</span>
-                  </>
-                ) : (
-                  <>
-                    <ArrowRight className="w-3.5 h-3.5 text-white" />
-                    <span className="text-white font-bold">{isSubmitting ? "Signing in..." : "Sign In to 961AI"}</span>
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-
-          {/* Explicit 'Not for now, just browsing' & Legal Microcopy */}
-          <div className="pt-3 mt-3 border-t border-slate-100 space-y-2">
-            {/* Prominent Not For Now, Just Browsing Button */}
-            <button
-              type="button"
-              onClick={handleDismiss}
-              className="w-full py-2 px-3 rounded-xl border border-slate-200 hover:border-[#FDE68A] bg-slate-50 hover:bg-[#FFFBEA] text-slate-700 hover:text-[#B45309] font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer group shadow-2xs"
-            >
-              <Compass className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#B45309] transition-colors" />
-              <span>Not for now, just browsing</span>
-              <ArrowRight className="w-3 h-3 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-            </button>
-
-            <p className="text-[10px] text-center text-slate-500 font-sans leading-relaxed">
-              By creating a free account, you join the{" "}
-              <strong className="text-slate-700">961AI Community Mailing List</strong> (NCEI Lebanon & Alkharizmi Solutions). No credit card required.
-            </p>
-          </div>
+        <div className="text-xs text-[#2E5A2C] font-bold flex items-center gap-1.5 self-start sm:self-auto">
+          <span className="w-2 h-2 rounded-full bg-[#4D7D4B] animate-pulse"></span>
+          <span>Fresh USD Salaries • Verified Institutional Grants</span>
         </div>
       </div>
+
+      {/* JOBS VIEW */}
+      {activeSubView === "jobs" && (
+        <div className="space-y-5">
+          {/* Filter Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-[#F6FAF5] rounded-xl border border-[#D7E7D6] text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold text-slate-700 flex items-center gap-1">
+                <Filter className="w-3.5 h-3.5 text-[#4D7D4B]" />
+                <span>Filter Role:</span>
+              </span>
+              {["all", "LLM & NLP", "Computer Vision", "MLOps & Infra", "Full-Stack AI"].map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setSelectedCategory(c)}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors ${
+                    selectedCategory === c
+                      ? "bg-[#4D7D4B] text-white shadow-2xs"
+                      : "bg-white text-slate-700 hover:bg-[#EBF3EA] border border-[#D7E7D6]"
+                  }`}
+                >
+                  {c === "all" ? "All Engineering" : c}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-600 font-medium">Experience:</span>
+              <select
+                value={selectedExp}
+                onChange={(e) => setSelectedExp(e.target.value)}
+                className="bg-white border border-[#D7E7D6] rounded-lg px-2.5 py-1 text-[11px] font-bold text-slate-800"
+              >
+                <option value="all">All Experience Levels</option>
+                <option value="Junior / Fresh Grad">Junior / Fresh Grad</option>
+                <option value="Mid-Level (2-4 yrs)">Mid-Level (2-4 yrs)</option>
+                <option value="Senior / Lead (5+ yrs)">Senior / Lead (5+ yrs)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Jobs List Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredJobs.map((job) => (
+              <div
+                key={job.id}
+                className="p-5 rounded-2xl bg-white border-2 border-[#D7E7D6] hover:border-[#75AC73] shadow-xs flex flex-col justify-between transition-all space-y-4"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#EBF3EA] text-[#2E5A2C] border border-[#B0CFAD]">
+                          {job.category}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                          {job.type}
+                        </span>
+                      </div>
+                      <h3 className="text-sm sm:text-base font-black text-[#000000] mt-1.5 leading-snug">
+                        {job.title}
+                      </h3>
+                      <div className="text-xs font-bold text-[#2E5A2C] flex items-center gap-1 mt-0.5">
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span>{job.companyName}</span>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-black text-[#2E5A2C] bg-[#EBF3EA] px-2.5 py-1 rounded-lg border border-[#B0CFAD]">
+                        {job.salaryRangeUsd}
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-[#000000] font-medium leading-relaxed font-sans">
+                    {job.description}
+                  </p>
+
+                  {job.universityPartner && (
+                    <div className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5 bg-[#F6FAF5] p-2 rounded-lg border border-[#D7E7D6]">
+                      <GraduationCap className="w-3.5 h-3.5 text-[#4D7D4B] shrink-0" />
+                      <span>{job.universityPartner}</span>
+                    </div>
+                  )}
+
+                  {/* Requirements List */}
+                  <div className="space-y-1 text-xs text-slate-700 font-sans">
+                    {job.requirements.map((req, idx) => (
+                      <div key={idx} className="flex items-start gap-1.5">
+                        <span className="text-[#4D7D4B] font-bold">✓</span>
+                        <span className="text-[11px] leading-tight">{req}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tech stack */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {job.techStack.map((tech) => (
+                      <span key={tech} className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-bold text-slate-800">
+                        {tech}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Footer Action */}
+                <div className="pt-3 border-t border-[#EBF3EA] flex items-center justify-between gap-3 text-xs">
+                  <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>Posted {job.postedAt}</span>
+                  </span>
+
+                  <a
+                    href={job.applyEmailOrUrl}
+                    onClick={() => setAppliedJobId(job.id)}
+                    className="px-4 py-1.5 rounded-xl bg-[#4D7D4B] hover:bg-[#3D633C] text-white font-bold flex items-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    <span>Direct Apply</span>
+                    <Send className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* GRANTS TRACKER VIEW */}
+      {activeSubView === "grants" && (
+        <div className="space-y-4">
+          <div className="p-4 bg-[#EBF3EA] border border-[#B0CFAD] rounded-xl text-xs text-[#2E5A2C] font-sans flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <strong className="font-mono font-black text-sm">Non-Dilutive Lebanese & MENA Grants Ledger</strong>
+              <p>Direct equity-free grants, compute vouchers, and matching export facilities open for Lebanese entities.</p>
+            </div>
+            <span className="px-3 py-1 bg-white text-[#2E5A2C] border border-[#75AC73] rounded-lg font-bold text-xs font-mono shrink-0">
+              100% Equity-Free
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {INITIAL_GRANT_DEADLINES.map((grant) => (
+              <div
+                key={grant.id}
+                className="p-5 rounded-2xl bg-white border-2 border-[#D7E7D6] hover:border-[#75AC73] shadow-xs flex flex-col justify-between space-y-4 transition-all"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#EBF3EA] text-[#2E5A2C] border border-[#B0CFAD]">
+                        {grant.stageEligibility}
+                      </span>
+                      <h3 className="text-sm sm:text-base font-black text-[#000000] leading-snug">
+                        {grant.name}
+                      </h3>
+                      <div className="text-xs font-bold text-slate-700">
+                        Provider: {grant.provider}
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-black text-[#2E5A2C] bg-[#EBF3EA] px-2.5 py-1 rounded-lg border border-[#B0CFAD]">
+                        {grant.grantSize}
+                      </div>
+                      <div className="text-[10px] text-rose-700 font-bold mt-1">
+                        {grant.daysRemaining} days left
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-[#000000] font-medium leading-relaxed font-sans">
+                    <strong>Focus:</strong> {grant.focus}
+                  </p>
+
+                  <div className="p-2.5 bg-[#F6FAF5] border border-[#D7E7D6] rounded-xl flex items-center justify-between text-xs text-slate-700">
+                    <span>Deadline Date: <strong className="text-slate-900">{grant.deadline}</strong></span>
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px]">
+                      Lebanon Entity Eligible
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-[#EBF3EA] flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    Official Portal Verified
+                  </span>
+                  <a
+                    href={grant.applyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-1.5 bg-[#4D7D4B] hover:bg-[#3D633C] text-white rounded-lg font-bold text-xs flex items-center gap-1 shadow-xs transition-colors"
+                  >
+                    <span>View RFP & Guidelines</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
-

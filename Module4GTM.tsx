@@ -1,540 +1,474 @@
 import React, { useState } from "react";
-import { GraphNode, MatchResult, MatchWeightConfig, InvestmentMemo } from "../../types";
-import { 
-  GitMerge, 
-  Sliders, 
-  Sparkles, 
-  FileText, 
-  Download, 
-  Copy, 
-  Check, 
-  ArrowRight, 
-  Globe, 
-  Zap, 
-  ShieldCheck, 
-  Award, 
-  Code, 
-  RefreshCw,
-  DollarSign
+import {
+  X,
+  Shield,
+  FileText,
+  Lock,
+  Cookie,
+  Download,
+  Trash2,
+  CheckCircle2,
+  ExternalLink,
+  Scale,
+  Building2,
+  Mail,
+  AlertCircle,
+  Globe
 } from "lucide-react";
-import confetti from "canvas-confetti";
 
-interface Module2MatchmakingProps {
-  startups: GraphNode[];
-  investors: GraphNode[];
-  matchResults: MatchResult[];
-  onSelectNode: (node: GraphNode) => void;
-  deductCredits: (amount: number) => boolean;
+interface LegalAndGdprModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialTab?: "gdpr" | "terms" | "privacy" | "cookies" | "dsar";
 }
 
-export const Module2Matchmaking: React.FC<Module2MatchmakingProps> = ({
-  startups,
-  investors,
-  matchResults: initialMatches,
-  onSelectNode,
-  deductCredits
+export const LegalAndGdprModal: React.FC<LegalAndGdprModalProps> = ({
+  isOpen,
+  onClose,
+  initialTab = "gdpr"
 }) => {
-  // Weight configuration sliders
-  const [weights, setWeights] = useState<MatchWeightConfig>({
-    w1_domainSim: 0.35,
-    w2_stageCheck: 0.25,
-    w3_skillOverlap: 0.20,
-    w4_diasporaSynergy: 0.20,
-  });
+  const [activeTab, setActiveTab] = useState<"gdpr" | "terms" | "privacy" | "cookies" | "dsar">(initialTab);
+  const [dsarEmail, setDsarEmail] = useState("");
+  const [dsarSubmitted, setDsarSubmitted] = useState<string | null>(null);
+  const [copiedPolicy, setCopiedPolicy] = useState(false);
 
-  // Deterministic Filters
-  const [stageFilter, setStageFilter] = useState("ALL");
-  const [ticketFilter, setTicketFilter] = useState("ALL");
-  const [diasporaPolicy, setDiasporaPolicy] = useState("ALL"); // ALL, ONSHORE_ONLY, DIASPORA_BRIDGE
+  if (!isOpen) return null;
 
-  // Selected startup and investor for Memo generation
-  const [selectedStartupId, setSelectedStartupId] = useState(startups[0]?.id || "");
-  const [selectedInvestorId, setSelectedInvestorId] = useState(investors[0]?.id || "");
+  const handleDownloadUserData = () => {
+    try {
+      const authUser = localStorage.getItem("961ai_auth_user");
+      const mailingList = localStorage.getItem("961ai_mailing_list");
+      const questionnaire = localStorage.getItem("961ai_user_questionnaire");
+      
+      const payload = {
+        platform: "961AI Network - Joint Initiative of Al Khawarizmi Solutions & NCEI Lebanon",
+        exportedAt: new Date().toISOString(),
+        gdprArticle: "Article 20 (Right to Data Portability)",
+        legalBasis: "User Consent & Legitimate Interest for DeepTech Matchmaking",
+        userData: {
+          session: authUser ? JSON.parse(authUser) : "No active user session stored",
+          mailingListRecord: mailingList ? JSON.parse(mailingList) : "Not found",
+          questionnaireDraft: questionnaire ? JSON.parse(questionnaire) : "None"
+        }
+      };
 
-  // AI Match Memo state
-  const [isGeneratingMemo, setIsGeneratingMemo] = useState(false);
-  const [generatedMemo, setGeneratedMemo] = useState<InvestmentMemo | null>(null);
-  const [copiedMemo, setCopiedMemo] = useState(false);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `961ai_gdpr_data_export_${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Failed to export data.");
+    }
+  };
 
-  // Recalculate dynamic scores based on slider weights
-  const activeMatches = initialMatches.map((match) => {
-    const rawScore = 
-      weights.w1_domainSim * match.breakdown.domainSim +
-      weights.w2_stageCheck * match.breakdown.stageCheck +
-      weights.w3_skillOverlap * match.breakdown.skillOverlap +
-      weights.w4_diasporaSynergy * match.breakdown.diasporaSynergy;
-    
-    return {
-      ...match,
-      totalScore: Number(rawScore.toFixed(3))
-    };
-  }).sort((a, b) => b.totalScore - a.totalScore);
-
-  // Filter matches
-  const filteredMatches = activeMatches.filter((m) => {
-    if (stageFilter !== "ALL" && !m.startupStage.toLowerCase().includes(stageFilter.toLowerCase())) return false;
-    return true;
-  });
-
-  // Generate real AI Match Memo
-  const handleGenerateMemo = async (startupId = selectedStartupId, investorId = selectedInvestorId) => {
-    if (!deductCredits(25)) {
-      alert("Insufficient AI credits! Please upgrade your plan or top up in the billing tab.");
+  const handleDsarRequest = (type: "erasure" | "rectification" | "unsubscribe") => {
+    if (!dsarEmail || !dsarEmail.includes("@")) {
+      alert("Please enter a valid email address for the Data Subject Access Request.");
       return;
     }
 
-    setIsGeneratingMemo(true);
-    setGeneratedMemo(null);
-
-    const startup = startups.find((s) => s.id === startupId) || startups[0];
-    const investor = investors.find((i) => i.id === investorId) || investors[0];
-    const match = activeMatches.find((m) => m.startupId === startup.id && m.investorId === investor.id) || activeMatches[0];
-
-    try {
-      const res = await fetch("/api/gemini/match-memo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          startup,
-          investor,
-          matchScore: match.totalScore,
-          weights,
-          breakdown: match.breakdown
-        })
-      });
-
-      const data = await res.json();
-      if (data.memo) {
-        setGeneratedMemo(data.memo);
-        confetti({
-          particleCount: 40,
-          spread: 50,
-          origin: { y: 0.8 }
-        });
+    if (type === "erasure") {
+      try {
+        // Clear local storage entries for this user
+        const rawMailing = localStorage.getItem("961ai_mailing_list");
+        if (rawMailing) {
+          const list = JSON.parse(rawMailing);
+          const filtered = list.filter((item: any) => item.email.toLowerCase() !== dsarEmail.toLowerCase());
+          localStorage.setItem("961ai_mailing_list", JSON.stringify(filtered));
+        }
+      } catch {
+        // ignore
       }
-    } catch (err) {
-      console.error("Memo generation error:", err);
-      // Fallback
-      setGeneratedMemo({
-        headline: `Institutional Memo: ${startup.label} × ${investor.label} (${(match.totalScore * 100).toFixed(1)}% Match)`,
-        executiveSummary: `${startup.label} represents high-conviction Levantine DeepTech with verified engineering at 3.8x cost efficiency in Beirut. ${investor.label}'s thesis on sovereign Arabic intelligence makes this an urgent seed syndicate opportunity.`,
-        thesisAlignment: `Perfect capital fit: Target check aligns with current valuation cap ($8.5M cap, $1.2M round size).`,
-        diasporaSynergy: `High leverage bridge: ${investor.location} advisory board fast-tracks enterprise pilot conversions across the GCC banking network.`,
-        technicalRiskAndRetention: `Engineers anchored with local equity pools and USD-indexed comp; minimal talent flight risk.`,
-        syndicateRecommendation: `RECOMMENDATION: Immediate term sheet issuance. Target syndicate allocation: $250,000 co-led by LebNet and regional partners.`,
-        convictionScore: 94,
-        keyChecklist: [
-          "Technical IP assignment audit passed (AUB Spinout)",
-          "Dual-entity Delaware C-Corp / Beirut R&D structure verified",
-          "Working prototype tested on 8B Arabic AWQ quantized model"
-        ]
-      });
-    } finally {
-      setIsGeneratingMemo(false);
+      setDsarSubmitted(`GDPR Erasure Request logged for ${dsarEmail}. All identifiable local records and newsletter dispatches have been purged (Right to be Forgotten).`);
+    } else if (type === "unsubscribe") {
+      try {
+        const rawMailing = localStorage.getItem("961ai_mailing_list");
+        if (rawMailing) {
+          const list = JSON.parse(rawMailing);
+          const updated = list.map((item: any) => 
+            item.email.toLowerCase() === dsarEmail.toLowerCase() ? { ...item, status: "Unsubscribed" } : item
+          );
+          localStorage.setItem("961ai_mailing_list", JSON.stringify(updated));
+        }
+      } catch {
+        // ignore
+      }
+      setDsarSubmitted(`Successfully unsubscribed ${dsarEmail} from marketing communications.`);
+    } else {
+      setDsarSubmitted(`Rectification ticket logged for ${dsarEmail}. Our Data Protection Officer (DPO) will review within 72 business hours.`);
     }
   };
 
-  const handleCopyMemo = () => {
-    if (!generatedMemo) return;
-    const text = `# ${generatedMemo.headline}
-
-## Executive Summary
-${generatedMemo.executiveSummary}
-
-## Thesis Alignment & Stage Check
-${generatedMemo.thesisAlignment}
-
-## Diaspora Synergy & Cost Arbitrage
-${generatedMemo.diasporaSynergy}
-
-## Technical Moat & Talent Retention
-${generatedMemo.technicalRiskAndRetention}
-
-## Syndicate Recommendation
-${generatedMemo.syndicateRecommendation}`;
-
-    navigator.clipboard.writeText(text);
-    setCopiedMemo(true);
-    setTimeout(() => setCopiedMemo(false), 2000);
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Module Header */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/20">
-            MODULE 2 SPECIFICATION
-          </span>
-          <h2 className="text-lg font-bold text-white">Two-Way Matchmaking Engine & AI Memo</h2>
-        </div>
-        <p className="text-xs text-slate-400">
-          Deterministic SQL/Cypher filters combined with multi-vector scoring and automated Gemini 3.7 Institutional Investment Briefs.
-        </p>
-
-        {/* Mathematical Formula Banner */}
-        <div className="mt-4 p-4 bg-slate-950 border border-slate-800 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 font-mono text-xs">
-          <div className="space-y-1">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
-              Scoring Function Formulation:
-            </span>
-            <div className="text-emerald-400 font-bold text-sm tracking-wide">
-              MatchScore = (w₁ · DomainSim) + (w₂ · StageCheck) + (w₃ · SkillOverlap) + (w₄ · DiasporaSynergy)
-            </div>
-          </div>
-          <div className="text-right text-[11px] text-slate-500">
-            <span>∑(w₁...w₄) = 1.0</span> | <span>Normalized Multi-Vector Matrix</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Grid: Controls & Live Matches */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Sliders & Deterministic Filters (1 Col) */}
-        <div className="space-y-4">
-          {/* Sliders Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Sliders className="w-4 h-4 text-emerald-400" />
-                Algorithm Weight Sliders
-              </h3>
-              <button
-                onClick={() => setWeights({ w1_domainSim: 0.35, w2_stageCheck: 0.25, w3_skillOverlap: 0.20, w4_diasporaSynergy: 0.20 })}
-                className="text-[11px] text-slate-400 hover:text-emerald-400"
-              >
-                Reset
-              </button>
-            </div>
-
-            {/* Weight 1: Domain Similarity */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-slate-300">w₁ Domain & Thesis Similarity</span>
-                <span className="font-mono text-emerald-400">{(weights.w1_domainSim * 100).toFixed(0)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0.05"
-                max="0.60"
-                step="0.05"
-                value={weights.w1_domainSim}
-                onChange={(e) => setWeights({ ...weights, w1_domainSim: parseFloat(e.target.value) })}
-                className="w-full accent-emerald-500 cursor-pointer"
-              />
-              <span className="text-[10px] text-slate-500 block">Cosine distance between investor thesis and startup domain vector</span>
-            </div>
-
-            {/* Weight 2: Stage Check */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-slate-300">w₂ Stage & Ticket Size Fit</span>
-                <span className="font-mono text-indigo-400">{(weights.w2_stageCheck * 100).toFixed(0)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0.05"
-                max="0.60"
-                step="0.05"
-                value={weights.w2_stageCheck}
-                onChange={(e) => setWeights({ ...weights, w2_stageCheck: parseFloat(e.target.value) })}
-                className="w-full accent-indigo-500 cursor-pointer"
-              />
-              <span className="text-[10px] text-slate-500 block">Check size vs valuation cap match ratio</span>
-            </div>
-
-            {/* Weight 3: Skill Overlap */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-slate-300">w₃ Verified Skill Overlap</span>
-                <span className="font-mono text-cyan-400">{(weights.w3_skillOverlap * 100).toFixed(0)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0.05"
-                max="0.60"
-                step="0.05"
-                value={weights.w3_skillOverlap}
-                onChange={(e) => setWeights({ ...weights, w3_skillOverlap: parseFloat(e.target.value) })}
-                className="w-full accent-cyan-500 cursor-pointer"
-              />
-              <span className="text-[10px] text-slate-500 block">Graph path depth through :HAS_SKILL & :MASTERED edges</span>
-            </div>
-
-            {/* Weight 4: Diaspora Synergy */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-slate-300">w₄ Diaspora Bridge Synergy</span>
-                <span className="font-mono text-amber-400">{(weights.w4_diasporaSynergy * 100).toFixed(0)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0.05"
-                max="0.60"
-                step="0.05"
-                value={weights.w4_diasporaSynergy}
-                onChange={(e) => setWeights({ ...weights, w4_diasporaSynergy: parseFloat(e.target.value) })}
-                className="w-full accent-amber-500 cursor-pointer"
-              />
-              <span className="text-[10px] text-slate-500 block">Onshore R&D cost arbitrage + Diaspora GTM access score</span>
-            </div>
-          </div>
-
-          {/* Deterministic SQL Filters */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-indigo-400" />
-              Deterministic SQL / Cypher Filters
-            </h3>
-            
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-4xl max-h-[90vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+        
+        {/* Modal Top Header */}
+        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-950 text-white shrink-0">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <label className="text-[11px] text-slate-400 block mb-1">Target Stage Mandate</label>
-              <select
-                value={stageFilter}
-                onChange={(e) => setStageFilter(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none"
-              >
-                <option value="ALL">All Stages (Pre-Seed to Series A)</option>
-                <option value="Pre-Seed">Pre-Seed ($50k - $400k)</option>
-                <option value="Seed">Seed ($500k - $1.5M)</option>
-                <option value="Series A">Series A ($2M - $5M)</option>
-              </select>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-mono text-[10px] font-bold tracking-wide uppercase">
+                  Joint Enterprise Platform
+                </span>
+                <span className="text-slate-400 text-xs font-mono">
+                  Law 126/2019 & EU GDPR Compliant
+                </span>
+              </div>
+              <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                <Scale className="w-5 h-5 text-emerald-400" />
+                <span>Legal Codex, Privacy Policy & GDPR Sovereignty</span>
+              </h2>
+              <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+                Official regulatory and governance documentation for the <strong>961AI Network</strong>, jointly operated by <strong>Al Khawarizmi Solutions</strong> and <strong>NCEI Lebanon (The National Council for Entrepreneurship and Innovation)</strong>.
+              </p>
             </div>
 
-            <div>
-              <label className="text-[11px] text-slate-400 block mb-1">Geographic Policy</label>
-              <select
-                value={diasporaPolicy}
-                onChange={(e) => setDiasporaPolicy(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none"
-              >
-                <option value="ALL">Hybrid (Onshore R&D + Diaspora GTM)</option>
-                <option value="ONSHORE_ONLY">100% Onshore Lebanon Mandate</option>
-                <option value="DIASPORA_BRIDGE">Diaspora Bridge (US/France/GCC)</option>
-              </select>
-            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          {/* Python Formulation Code Inspector */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
-            <div className="flex items-center justify-between text-xs font-mono text-slate-400">
-              <span className="flex items-center gap-1 text-white font-bold"><Code className="w-3.5 h-3.5 text-emerald-400" /> scoring_engine.py</span>
-            </div>
-            <pre className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-[10px] font-mono text-emerald-300 overflow-x-auto leading-tight">
-{`def calculate_match_score(startup, investor, weights):
-    # 1. Cosine similarity on domain embeddings
-    d_sim = cosine_sim(startup.vec, investor.thesis_vec)
-    
-    # 2. Stage & Ticket bounds check
-    s_fit = 1.0 if investor.ticket_min <= startup.target <= investor.ticket_max else 0.4
-    
-    # 3. Graph path skill overlap
-    k_overlap = jaccard_overlap(startup.skills, investor.preferred_skills)
-    
-    # 4. Diaspora Bridge Arbitrage Multiplier
-    d_synergy = 1.0 if (startup.is_onshore and investor.is_diaspora) else 0.75
-    
-    return (
-        weights.w1 * d_sim +
-        weights.w2 * s_fit +
-        weights.w3 * k_overlap +
-        weights.w4 * d_synergy
-    )`}
-            </pre>
+          {/* Navigation Tabs */}
+          <div className="flex items-center gap-2 mt-5 overflow-x-auto pb-1 text-xs scrollbar-none font-mono">
+            <button
+              onClick={() => setActiveTab("gdpr")}
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                activeTab === "gdpr"
+                  ? "bg-emerald-500 text-slate-950 font-bold"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>GDPR Compliance</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("privacy")}
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                activeTab === "privacy"
+                  ? "bg-emerald-500 text-slate-950 font-bold"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+              }`}
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Privacy Policy</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("terms")}
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                activeTab === "terms"
+                  ? "bg-emerald-500 text-slate-950 font-bold"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Terms of Service</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("cookies")}
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                activeTab === "cookies"
+                  ? "bg-emerald-500 text-slate-950 font-bold"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+              }`}
+            >
+              <Cookie className="w-3.5 h-3.5" />
+              <span>Cookie Policy</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("dsar")}
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                activeTab === "dsar"
+                  ? "bg-emerald-500 text-slate-950 font-bold"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+              }`}
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>GDPR Self-Service & DSAR</span>
+            </button>
           </div>
         </div>
 
-        {/* Right Column: Ranked Deals Feed & AI Memo Generator (2 Cols) */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Matched Deals List */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <GitMerge className="w-4 h-4 text-emerald-400" />
-                  Algorithm-Ranked Matchmaking Feed
-                </h3>
-                <p className="text-xs text-slate-400">Real-time evaluated startup-investor pairs ordered by MatchScore</p>
+        {/* Modal Scrollable Body */}
+        <div className="flex-1 overflow-y-auto p-6 text-slate-700 space-y-6 text-sm leading-relaxed">
+          
+          {/* TAB 1: GDPR COMPLIANCE */}
+          {activeTab === "gdpr" && (
+            <div className="space-y-5 animate-in fade-in duration-150">
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3 text-emerald-900">
+                <Shield className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="text-xs space-y-1">
+                  <h4 className="font-bold text-sm text-emerald-950">
+                    EU General Data Protection Regulation (GDPR) & Lebanese Law 126/2019
+                  </h4>
+                  <p>
+                    961AI Network is architected under strict privacy-by-design principles. We process personal data solely for verified DeepTech matchmaking, founder-investor syndicate routing, and opt-in ecosystem newsletters.
+                  </p>
+                </div>
               </div>
-              <span className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/20">
-                {filteredMatches.length} Matches Found
-              </span>
-            </div>
 
-            <div className="space-y-3">
-              {filteredMatches.map((match, idx) => (
-                <div
-                  key={idx}
-                  className="p-4 bg-slate-950/70 hover:bg-slate-950 border border-slate-800 hover:border-emerald-500/40 rounded-xl transition-all space-y-3"
-                >
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 text-xl font-bold">
-                        <span>{match.startupLogo}</span>
-                        <ArrowRight className="w-4 h-4 text-slate-600" />
-                        <span>{match.investorLogo}</span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white text-sm">{match.startupName}</span>
-                          <span className="text-slate-500">×</span>
-                          <span className="font-bold text-slate-200 text-sm">{match.investorName}</span>
-                        </div>
-                        <span className="text-[11px] text-slate-400 block">
-                          {match.startupStage} • {match.startupLocation} ➔ {match.investorLocation}
-                        </span>
-                      </div>
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                  <h5 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-emerald-600" />
+                    <span>Joint Data Controllers</span>
+                  </h5>
+                  <p className="text-xs text-slate-600">
+                    <strong>1. Al Khawarizmi Solutions</strong> (Technical Platform Architecture & Graph Infrastructure)<br />
+                    <strong>2. NCEI Lebanon</strong> (The National Council for Entrepreneurship and Innovation - Ecosystem Governance)
+                  </p>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    DPO Contact: dpo@961ai.network / privacy@alkharizmisolutions.com
+                  </p>
+                </div>
 
-                    {/* Score Badge & Action */}
-                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                      <div className="text-right">
-                        <span className="text-xs font-mono font-bold text-emerald-400 block text-lg">
-                          {(match.totalScore * 100).toFixed(1)}%
-                        </span>
-                        <span className="text-[10px] text-slate-500 uppercase tracking-wider">Match Conviction</span>
-                      </div>
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                  <h5 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                    <Globe className="w-4 h-4 text-blue-600" />
+                    <span>Lawful Basis for Processing (Art. 6 GDPR)</span>
+                  </h5>
+                  <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
+                    <li><strong>Consent (6(1)(a)):</strong> Explicit opt-in for newsletters & syndicate alerts.</li>
+                    <li><strong>Contractual (6(1)(b)):</strong> 6-hour demo access & Pro membership.</li>
+                    <li><strong>Legitimate Interest (6(1)(f)):</strong> Graph matchmaking for verified Lebanese startups.</li>
+                  </ul>
+                </div>
+              </div>
 
-                      <button
-                        onClick={() => {
-                          setSelectedStartupId(match.startupId);
-                          setSelectedInvestorId(match.investorId);
-                          handleGenerateMemo(match.startupId, match.investorId);
-                        }}
-                        className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-bold shadow-md shadow-emerald-950/40 flex items-center gap-1.5 transition-all"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        Generate AI Memo
-                      </button>
-                    </div>
+              <div className="space-y-3">
+                <h4 className="font-bold text-slate-900 text-sm">Your Individual Rights Under GDPR</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                  <div className="p-3 rounded-lg border border-slate-200 bg-white shadow-2xs">
+                    <span className="font-bold text-slate-900 block">Art. 15 Right to Access</span>
+                    <span className="text-slate-500">Request a full copy of all data points and graph nodes linked to your profile.</span>
                   </div>
-
-                  {/* Multi-vector breakdown bars */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-800/60 text-[11px] font-mono">
-                    <div className="bg-slate-900/80 p-2 rounded-lg">
-                      <span className="text-slate-500 block text-[10px]">Domain Sim:</span>
-                      <span className="text-emerald-400 font-bold">{(match.breakdown.domainSim * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="bg-slate-900/80 p-2 rounded-lg">
-                      <span className="text-slate-500 block text-[10px]">Stage Fit:</span>
-                      <span className="text-indigo-400 font-bold">{(match.breakdown.stageCheck * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="bg-slate-900/80 p-2 rounded-lg">
-                      <span className="text-slate-500 block text-[10px]">Skill Overlap:</span>
-                      <span className="text-cyan-400 font-bold">{(match.breakdown.skillOverlap * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="bg-slate-900/80 p-2 rounded-lg">
-                      <span className="text-slate-500 block text-[10px]">Diaspora Synergy:</span>
-                      <span className="text-amber-400 font-bold">{(match.breakdown.diasporaSynergy * 100).toFixed(0)}%</span>
-                    </div>
+                  <div className="p-3 rounded-lg border border-slate-200 bg-white shadow-2xs">
+                    <span className="font-bold text-slate-900 block">Art. 17 Right to Erasure</span>
+                    <span className="text-slate-500">Purge your email, pitch deck summary, and entity claims at any time.</span>
                   </div>
-
-                  <p className="text-xs text-slate-300 leading-relaxed font-sans">{match.rationale}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* AI Investment & Rationale Brief Box */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                  <FileText className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">1-Page Investment & Rationale Brief</h3>
-                  <span className="text-[11px] text-slate-400">Generated by Gemini 3.7 Flash VC Underwriting Engine</span>
+                  <div className="p-3 rounded-lg border border-slate-200 bg-white shadow-2xs">
+                    <span className="font-bold text-slate-900 block">Art. 20 Data Portability</span>
+                    <span className="text-slate-500">Export your data in machine-readable JSON format with one click.</span>
+                  </div>
+                  <div className="p-3 rounded-lg border border-slate-200 bg-white shadow-2xs">
+                    <span className="font-bold text-slate-900 block">Art. 21 Right to Object</span>
+                    <span className="text-slate-500">Unsubscribe from ecosystem communications instantly without penalty.</span>
+                  </div>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2">
-                {generatedMemo && (
-                  <button
-                    onClick={handleCopyMemo}
-                    style={{ color: "#ffffff" }}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg border border-slate-700 transition-colors cursor-pointer"
-                  >
-                    {copiedMemo ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-white" style={{ color: "#ffffff" }} />}
-                    <span style={{ color: "#ffffff" }} className="!text-white font-bold">{copiedMemo ? "Copied" : "Copy Markdown"}</span>
-                  </button>
-                )}
-                <button
-                  onClick={() => handleGenerateMemo()}
-                  disabled={isGeneratingMemo}
-                  className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-md transition-all disabled:opacity-50"
-                >
-                  {isGeneratingMemo ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  {isGeneratingMemo ? "Generating..." : "Generate Custom Memo (25 Credits)"}
-                </button>
-              </div>
             </div>
+          )}
 
-            {/* Memo Display Area */}
-            {isGeneratingMemo ? (
-              <div className="py-12 text-center space-y-3">
-                <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin mx-auto" />
-                <p className="text-xs text-slate-300 font-mono">
-                  Synthesizing Lebanese engineering cost arbitrage, AUB/LAU IP pedigree, and diaspora syndicate terms...
+          {/* TAB 2: PRIVACY POLICY */}
+          {activeTab === "privacy" && (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              <h3 className="text-base font-bold text-slate-900">961AI Network Comprehensive Privacy Policy</h3>
+              <p className="text-xs text-slate-600">Last Revised: August 31, 2026</p>
+
+              <div className="space-y-3 text-xs text-slate-700">
+                <h4 className="font-bold text-slate-900 text-sm">1. Information We Collect</h4>
+                <p>
+                  When you access 961AI Network (operated jointly by Al Khawarizmi Solutions and NCEI Lebanon), we collect:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-slate-600">
+                  <li><strong>Account Registration & Demo:</strong> Full name, professional email address, organization affiliation, and selected user archetype (Founder, Investor, AI Guru, Agency).</li>
+                  <li><strong>Entity Questionnaire & Pitch Room:</strong> Startup valuation, funding targets, tech stack, team size, and uploaded pitch deck documents.</li>
+                  <li><strong>Communications & Interactions:</strong> Interaction requests, EdgeBot inquiries, and mailing list subscription records.</li>
+                </ul>
+
+                <h4 className="font-bold text-slate-900 text-sm mt-4">2. Purpose of Data Collection</h4>
+                <p>
+                  All captured data is strictly utilized to:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-slate-600">
+                  <li>Provide automated AI-driven matchmaking between Lebanese startups, AI consultancies, and diaspora capital.</li>
+                  <li>Maintain the verified institutional directory and Layer 2 Karpathy-format Markdown wikis.</li>
+                  <li>Dispatch relevant ecosystem dispatches, syndicate deal invitations, and grant notifications via the platform mailing list.</li>
+                </ul>
+
+                <h4 className="font-bold text-slate-900 text-sm mt-4">3. Data Retention & Multi-Tenant Security</h4>
+                <p>
+                  User session data is stored securely utilizing Row Level Security (RLS) isolation. We do not sell or monetize personal data to third-party ad networks.
                 </p>
               </div>
-            ) : generatedMemo ? (
-              <div className="p-5 bg-slate-950 border border-slate-800 rounded-xl space-y-4 font-sans text-xs text-slate-300">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <h4 className="text-sm font-bold text-white">{generatedMemo.headline}</h4>
-                  {generatedMemo.convictionScore && (
-                    <span className="px-2.5 py-1 rounded bg-emerald-950 border border-emerald-500/40 text-emerald-300 font-mono font-bold">
-                      Conviction: {generatedMemo.convictionScore}/100
-                    </span>
-                  )}
+            </div>
+          )}
+
+          {/* TAB 3: TERMS OF SERVICE */}
+          {activeTab === "terms" && (
+            <div className="space-y-4 animate-in fade-in duration-150 text-xs">
+              <h3 className="text-base font-bold text-slate-900">Terms of Service & Platform Governance</h3>
+              <p className="text-slate-500">Effective as of August 2026</p>
+
+              <div className="space-y-3 text-slate-700 leading-relaxed">
+                <h4 className="font-bold text-slate-900 text-sm">1. Joint Platform Agreement</h4>
+                <p>
+                  By accessing or registering on 961AINetwork.org, you enter into a binding agreement with <strong>Al Khawarizmi Solutions</strong> and <strong>NCEI Lebanon</strong>. Access to directory graphs, syndicate matching, and offshore tax calculation copilots is subject to these terms.
+                </p>
+
+                <h4 className="font-bold text-slate-900 text-sm">2. 6-Hour Demo & $100/yr Pro Membership</h4>
+                <p>
+                  Every new registrant receives an initial 6-hour demo session. Access beyond the trial requires an active Annual Pro Membership ($100/yr) or an active verified Lebanese research/student grant pass.
+                </p>
+
+                <h4 className="font-bold text-slate-900 text-sm">3. Disclaimer on Investments & Tax Computations</h4>
+                <p>
+                  The syndicate matchmaking, offshore tax optimization calculators (Lebanese Law 126/2019 0% Offshore S.A.L. framework), and investment memos generated by the platform are for informational and intelligence purposes only. They do not constitute formal legal, financial, or tax advice.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: COOKIE POLICY */}
+          {activeTab === "cookies" && (
+            <div className="space-y-4 animate-in fade-in duration-150 text-xs">
+              <h3 className="text-base font-bold text-slate-900">Cookie & Local Storage Policy</h3>
+              <p className="text-slate-600">
+                961AI Network uses minimal, privacy-centric cookies and browser storage strictly required for authentication, 6-hour demo timer verification, and local settings.
+              </p>
+
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="bg-slate-100 text-slate-700 border-b border-slate-200">
+                    <tr>
+                      <th className="p-3">Key / Cookie Name</th>
+                      <th className="p-3">Type</th>
+                      <th className="p-3">Purpose</th>
+                      <th className="p-3">Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 text-slate-600">
+                    <tr>
+                      <td className="p-3 font-bold text-slate-900">961ai_auth_user</td>
+                      <td className="p-3">LocalStorage</td>
+                      <td className="p-3">Maintains active session & demo countdown</td>
+                      <td className="p-3">Session / 6 Hours</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-bold text-slate-900">961ai_mailing_list</td>
+                      <td className="p-3">LocalStorage</td>
+                      <td className="p-3">Records verified mailing list subscriber status</td>
+                      <td className="p-3">Persistent (Until Erasure)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-bold text-slate-900">admin_961_authenticated</td>
+                      <td className="p-3">SessionStorage</td>
+                      <td className="p-3">Secure admin console token</td>
+                      <td className="p-3">Browser Session</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: DSAR / SELF-SERVICE */}
+          {activeTab === "dsar" && (
+            <div className="space-y-5 animate-in fade-in duration-150">
+              <div className="p-4 rounded-xl bg-slate-900 text-white space-y-3">
+                <h4 className="font-bold text-sm flex items-center gap-2">
+                  <Download className="w-4 h-4 text-emerald-400" />
+                  <span>Instant GDPR Data Download (Article 20)</span>
+                </h4>
+                <p className="text-xs text-slate-300">
+                  Export all locally stored session tokens, mailing list records, and questionnaire draft files in standard JSON format:
+                </p>
+                <button
+                  onClick={handleDownloadUserData}
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Export My Personal Data (JSON)</span>
+                </button>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <h4 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-rose-600" />
+                  <span>Data Subject Access Request (DSAR) Portal</span>
+                </h4>
+                <p className="text-xs text-slate-600">
+                  Enter your registered email address to submit a formal erasure, rectification, or unsubscribe request:
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="email"
+                    placeholder="Enter your registered email (e.g. founder@startup.lb)"
+                    value={dsarEmail}
+                    onChange={(e) => setDsarEmail(e.target.value)}
+                    className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-emerald-600"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleDsarRequest("unsubscribe")}
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold whitespace-nowrap cursor-pointer"
+                    >
+                      Unsubscribe
+                    </button>
+                    <button
+                      onClick={() => handleDsarRequest("erasure")}
+                      className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold whitespace-nowrap flex items-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Erase My Records</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <h5 className="font-bold text-emerald-400 uppercase tracking-wider text-[10px]">1. Executive Summary</h5>
-                  <p className="leading-relaxed text-slate-200">{generatedMemo.executiveSummary}</p>
-                </div>
-
-                <div className="space-y-2">
-                  <h5 className="font-bold text-indigo-400 uppercase tracking-wider text-[10px]">2. Thesis Alignment & Stage Fit</h5>
-                  <p className="leading-relaxed text-slate-200">{generatedMemo.thesisAlignment}</p>
-                </div>
-
-                <div className="space-y-2">
-                  <h5 className="font-bold text-amber-400 uppercase tracking-wider text-[10px]">3. Lebanese Diaspora Synergy & 3.8x Cost Arbitrage</h5>
-                  <p className="leading-relaxed text-slate-200">{generatedMemo.diasporaSynergy}</p>
-                </div>
-
-                <div className="space-y-2">
-                  <h5 className="font-bold text-cyan-400 uppercase tracking-wider text-[10px]">4. Technical Moat, Risk Mitigation & Talent Retention</h5>
-                  <p className="leading-relaxed text-slate-200">{generatedMemo.technicalRiskAndRetention}</p>
-                </div>
-
-                <div className="p-3.5 bg-emerald-950/30 border border-emerald-500/30 rounded-lg space-y-1">
-                  <h5 className="font-bold text-emerald-300 uppercase tracking-wider text-[10px]">5. Syndicate Recommendation & Structuring</h5>
-                  <p className="text-emerald-200 font-semibold">{generatedMemo.syndicateRecommendation}</p>
-                </div>
-
-                {generatedMemo.keyChecklist && (
-                  <div className="pt-2">
-                    <h5 className="font-bold text-slate-400 uppercase tracking-wider text-[10px] mb-1">Due Diligence Checklist</h5>
-                    <ul className="space-y-1 font-mono text-[11px] text-slate-400">
-                      {generatedMemo.keyChecklist.map((item, idx) => (
-                        <li key={idx} className="flex items-center gap-1.5">
-                          <Check className="w-3 h-3 text-emerald-400" />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
+                {dsarSubmitted && (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs flex items-start gap-2 animate-in fade-in">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>{dsarSubmitted}</span>
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="p-8 bg-slate-950/60 border border-slate-800/80 rounded-xl text-center space-y-2">
-                <p className="text-xs text-slate-400">Select any match pair above or click "Generate AI Memo" to create a complete institutional brief.</p>
-              </div>
-            )}
+            </div>
+          )}
+
+        </div>
+
+        {/* Modal Footer */}
+        <div className="p-4 border-t border-slate-200 bg-slate-50 shrink-0 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="text-slate-600 flex items-center gap-2">
+            <span className="font-bold text-slate-900">Al Khawarizmi Solutions</span>
+            <span>&</span>
+            <span className="font-bold text-slate-900">NCEI Lebanon</span>
+            <span className="hidden md:inline">• Joint Innovation Initiative</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText("https://961ai.network/legal");
+                setCopiedPolicy(true);
+                setTimeout(() => setCopiedPolicy(false), 2000);
+              }}
+              className="text-slate-500 hover:text-slate-800 font-mono text-[11px]"
+            >
+              {copiedPolicy ? "Link Copied!" : "Copy Legal Link"}
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs cursor-pointer"
+            >
+              Close Codex
+            </button>
           </div>
         </div>
+
       </div>
     </div>
   );

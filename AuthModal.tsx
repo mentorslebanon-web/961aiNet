@@ -1,181 +1,147 @@
-import React, { useState, useEffect } from "react";
-import { UserAuthSession } from "../types";
-import { Clock, Crown, ArrowRight, AlertTriangle, X } from "lucide-react";
+-- ==============================================================================
+-- 961AI NETWORK | DATABASE MIGRATION SCRIPT
+-- Migration: 001_z961_second_brain_tables.sql
+-- Description: Creates persistent tables for User Second Brain Workspace, 
+--              multi-channel workspace entries (Research, Contacts, Notes, Follow-ups),
+--              and WhatsApp z24seven capture webhooks.
+-- Compatible with: PostgreSQL 14+, Supabase, Cloud SQL
+-- ==============================================================================
 
-interface DemoExpiryBannerProps {
-  user: UserAuthSession | null;
-  onOpenPricing: () => void;
-  onOpenAuth: () => void;
-}
+-- 1. EXTENSIONS
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
-export const DemoExpiryBanner: React.FC<DemoExpiryBannerProps> = ({
-  user,
-  onOpenPricing,
-  onOpenAuth
-}) => {
-  const [isDismissed, setIsDismissed] = useState(false);
-  const [timeLeftMs, setTimeLeftMs] = useState<number>(() => {
-    if (!user) return 0;
-    if (user.isPremium) return 999999999;
-    return Math.max(0, user.demoExpiresAt - Date.now());
-  });
-
-  useEffect(() => {
-    if (!user || user.isPremium) return;
-
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, user.demoExpiresAt - Date.now());
-      setTimeLeftMs(remaining);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [user]);
-
-  if (isDismissed) {
-    return null;
-  }
-
-  // Guest / Non-logged in banner (Grey-Blue theme)
-  if (!user) {
-    return (
-      <div className="bg-gradient-to-r from-slate-100 via-blue-50/40 to-slate-100 border-b border-slate-300 py-2 px-4 text-xs font-mono text-slate-800">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
-          <div className="flex items-center gap-2 text-slate-700">
-            <span className="w-2 h-2 rounded-full bg-slate-500 animate-ping" />
-            <span className="font-bold text-slate-900">Lebanon AI Network Demo Access:</span>
-            <span className="text-slate-600">Sign up to get 6 hours of full platform exploration for free.</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onOpenAuth}
-              className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold transition-all text-[11px] shadow-2xs"
-            >
-              Sign Up (6h Demo)
-            </button>
-            <button
-              onClick={onOpenPricing}
-              className="text-slate-700 hover:text-slate-900 hover:underline font-bold text-[11px] flex items-center gap-1"
-            >
-              <Crown className="w-3 h-3 text-amber-600" />
-              <span>Annual Pro ($100/yr)</span>
-            </button>
-            <button
-              onClick={() => setIsDismissed(true)}
-              className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-all ml-1"
-              aria-label="Close banner"
-              title="Close banner"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
+-- 2. UPDATE USERS TABLE WITH SECOND BRAIN FIELDS
+-- Ensure users table exists or alter with required z961 workspace columns
+DO $$ 
+BEGIN
+    -- Check if table exists, if not create base structure
+    CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(64) PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'founder',
+        affiliation VARCHAR(255),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
     );
-  }
 
-  // Format hours, minutes, seconds
-  const totalSeconds = Math.floor(timeLeftMs / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
+    -- Add z961_second_brain_id if not present
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'z961_second_brain_id'
+    ) THEN
+        ALTER TABLE users ADD COLUMN z961_second_brain_id VARCHAR(128);
+    END IF;
 
-  const isExpired = !user.isPremium && timeLeftMs <= 0;
+    -- Add whatsapp_phone if not present
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'whatsapp_phone'
+    ) THEN
+        ALTER TABLE users ADD COLUMN whatsapp_phone VARCHAR(64);
+    END IF;
 
-  if (user.isPremium) {
-    return (
-      <div className="bg-slate-100 border-b border-slate-300 py-1.5 px-4 text-xs font-mono text-slate-800">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2 text-slate-800 font-semibold">
-            <Crown className="w-4 h-4 text-amber-600" />
-            <span>961AI Annual Pro Member • {user.name} ({user.affiliation || "Verified Member"})</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-slate-700 font-bold bg-white px-2 py-0.5 rounded border border-slate-300">
-              Active Subscription ($100/yr)
-            </span>
-            <button
-              onClick={() => setIsDismissed(true)}
-              className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-all"
-              aria-label="Close banner"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+    -- Add ingested_sources_count if not present
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'ingested_sources_count'
+    ) THEN
+        ALTER TABLE users ADD COLUMN ingested_sources_count INTEGER DEFAULT 0;
+    END IF;
+END $$;
 
-  // Expired Demo Alert (Grey-Blue Slate Theme with Close Button)
-  if (isExpired) {
-    return (
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700 text-slate-100 py-2.5 px-4 text-xs font-mono shadow-md animate-in slide-in-from-top-2">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-          <div className="flex items-center gap-2.5">
-            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-            <div>
-              <strong className="tracking-wide text-white">6-Hour Demo Usage Has Expired:</strong>
-              <span className="ml-1.5 text-slate-300">
-                Your free 6-hour trial for {user.email || "demo.guest@961ai.network"} has ended. Upgrade to Annual Pro ($100 / Year) to maintain full access.
-              </span>
-            </div>
-          </div>
+-- Create index on whatsapp_phone for lightning-fast webhook phone matching
+CREATE INDEX IF NOT EXISTS idx_users_whatsapp_phone ON users(whatsapp_phone);
+CREATE INDEX IF NOT EXISTS idx_users_second_brain_id ON users(z961_second_brain_id);
 
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={onOpenPricing}
-              className="px-4 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black shadow-sm flex items-center gap-1.5 text-xs transition-all"
-            >
-              <Crown className="w-3.5 h-3.5 text-slate-900" />
-              <span>Upgrade to Pro ($100/yr)</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setIsDismissed(true)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/80 transition-all"
-              aria-label="Close expired demo notification"
-              title="Close notification"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+-- 3. CREATE Z961 WORKSPACES TABLE
+CREATE TABLE IF NOT EXISTS z961_workspaces (
+    id VARCHAR(128) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    starter_assets_count INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    settings JSONB DEFAULT '{
+        "zero_hallucination_mode": true,
+        "law_126_safe_harbor": true,
+        "auto_audio_overview": true,
+        "whatsapp_sync_enabled": true
+    }'::jsonb
+);
 
-  // Active Demo Countdown (Grey-Blue Theme with Close Button)
-  return (
-    <div className="bg-gradient-to-r from-slate-100 via-blue-50/30 to-slate-100 border-b-2 border-slate-300 py-2 px-4 text-xs font-mono text-slate-800">
-      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-slate-800">
-          <Clock className="w-4 h-4 text-slate-600 animate-pulse" />
-          <span className="font-bold">6-Hour Demo Access:</span>
-          <span className="px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-900 font-black font-mono shadow-2xs">
-            {hours.toString().padStart(2, "0")}h {minutes.toString().padStart(2, "0")}m {seconds.toString().padStart(2, "0")}s remaining
-          </span>
-          <span className="hidden md:inline text-slate-500">({user.name})</span>
-        </div>
+CREATE INDEX IF NOT EXISTS idx_z961_workspaces_user_id ON z961_workspaces(user_id);
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={onOpenPricing}
-            className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold transition-all text-[11px] shadow-2xs flex items-center gap-1.5"
-          >
-            <Crown className="w-3.5 h-3.5 text-amber-300" />
-            <span>Move to Annual Pro ($100 / Year)</span>
-          </button>
-          <button
-            onClick={() => setIsDismissed(true)}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-all"
-            aria-label="Close banner"
-            title="Close banner"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+-- 4. CREATE WORKSPACE ENTRIES TABLE (MULTI-CHANNEL INGESTION)
+-- Categories: 'research', 'contact', 'note', 'followup'
+-- Source types: 'web_cta', 'whatsapp', 'file_upload', 'seed', 'web_clipper'
+CREATE TABLE IF NOT EXISTS workspace_entries (
+    id VARCHAR(128) PRIMARY KEY,
+    workspace_id VARCHAR(128) NOT NULL REFERENCES z961_workspaces(id) ON DELETE CASCADE,
+    user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category VARCHAR(32) NOT NULL CHECK (category IN ('research', 'contact', 'note', 'followup')),
+    source_type VARCHAR(32) NOT NULL CHECK (source_type IN ('web_cta', 'whatsapp', 'file_upload', 'seed', 'web_clipper')),
+    title VARCHAR(255) NOT NULL,
+    content_payload JSONB NOT NULL,
+    is_pinned BOOLEAN DEFAULT FALSE,
+    is_grounded_active BOOLEAN DEFAULT TRUE,
+    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_workspace_entries_workspace_id ON workspace_entries(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_workspace_entries_user_id ON workspace_entries(user_id);
+CREATE INDEX IF NOT EXISTS idx_workspace_entries_category ON workspace_entries(category);
+CREATE INDEX IF NOT EXISTS idx_workspace_entries_source_type ON workspace_entries(source_type);
+CREATE INDEX IF NOT EXISTS idx_workspace_entries_timestamp ON workspace_entries(timestamp DESC);
+
+-- GIN Index for fast JSON search on content_payload
+CREATE INDEX IF NOT EXISTS idx_workspace_entries_payload ON workspace_entries USING gin(content_payload);
+
+-- 5. CREATE WHATSAPP WEBHOOK INGEST LOGS TABLE (Z24SEVEN ENGINE)
+CREATE TABLE IF NOT EXISTS z24seven_webhook_logs (
+    id VARCHAR(128) PRIMARY KEY,
+    from_phone VARCHAR(64) NOT NULL,
+    matched_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+    matched_workspace_id VARCHAR(128) REFERENCES z961_workspaces(id) ON DELETE SET NULL,
+    message_type VARCHAR(32) NOT NULL, -- 'text', 'voice_note', 'contact_card', 'followup'
+    raw_payload JSONB NOT NULL,
+    extracted_category VARCHAR(32),
+    created_entry_id VARCHAR(128) REFERENCES workspace_entries(id) ON DELETE SET NULL,
+    status VARCHAR(32) DEFAULT 'processed',
+    received_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_z24seven_phone ON z24seven_webhook_logs(from_phone);
+CREATE INDEX IF NOT EXISTS idx_z24seven_received_at ON z24seven_webhook_logs(received_at DESC);
+
+-- 6. AUTOMATED TRIGGER: UPDATE INGESTED_SOURCES_COUNT ON USERS
+CREATE OR REPLACE FUNCTION update_user_sources_count()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE users 
+        SET ingested_sources_count = ingested_sources_count + 1,
+            updated_at = NOW()
+        WHERE id = NEW.user_id;
+    ELSIF TG_OP = 'DELETE' THEN
+        UPDATE users 
+        SET ingested_sources_count = GREATEST(0, ingested_sources_count - 1),
+            updated_at = NOW()
+        WHERE id = OLD.user_id;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_update_user_sources_count ON workspace_entries;
+CREATE TRIGGER trg_update_user_sources_count
+AFTER INSERT OR DELETE ON workspace_entries
+FOR EACH ROW EXECUTE FUNCTION update_user_sources_count();
+
+-- 7. COMMENTARY & METADATA
+COMMENT ON TABLE z961_workspaces IS 'Dedicated Gemini/NotebookLM Second Brain workspaces auto-provisioned upon user sign-up';
+COMMENT ON TABLE workspace_entries IS 'Multi-channel entries captured from Web CTAs, WhatsApp z24seven, File Uploads, and Web Clippers';
+COMMENT ON TABLE z24seven_webhook_logs IS 'Real-time audit log of incoming WhatsApp z24seven messages and automated entity routing';

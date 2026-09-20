@@ -1,489 +1,594 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { 
-  CommunityNewsStory, 
-  getCommunityNews, 
-  likeCommunityNewsStory, 
-  incrementCommunityNewsViews 
-} from "../../lib/communityNews";
-import { SocialShareButtons } from "../common/SocialShareButtons";
-import { 
-  Newspaper, 
-  ArrowRight, 
-  PlusCircle, 
-  Search,
-  Calendar, 
-  Clock, 
-  Tag, 
-  User, 
-  Building2, 
-  ExternalLink, 
-  Heart, 
-  Share2, 
-  Sparkles, 
-  CheckCircle2, 
-  X,
-  TrendingUp,
-  Flame,
-  Award,
-  BookOpen
-} from "lucide-react";
+import { MailingListSubscriber } from "../types";
+import { triggerNotificationForSubscriberStatus } from "./notificationQueue";
 
-interface CommunityNewsSectionProps {
-  onNavigateToCommunityNews: () => void;
-  onNavigateToSubmitNews: () => void;
+export interface MailingListRegistration {
+  id: string;
+  email: string;
+  name: string;
+  role?: string;
+  affiliation?: string;
+  source: string;
+  subscribedAt: string;
+  status: "Active" | "Verified" | "Unsubscribed";
+  gdprConsent: boolean;
+  notes?: string;
 }
 
-export const CommunityNewsSection: React.FC<CommunityNewsSectionProps> = ({
-  onNavigateToCommunityNews,
-  onNavigateToSubmitNews
-}) => {
-  const [allStories, setAllStories] = useState<CommunityNewsStory[]>(() => {
-    const all = getCommunityNews();
-    const published = all.filter((s) => s.status === "published" || s.status === "featured");
-    published.sort((a, b) => b.timestamp - a.timestamp);
-    return published;
-  });
+export interface TrialUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  affiliation: string;
+  whatsappPhone?: string;
+  registeredAt: string;
+  demoExpiresAt: number; // timestamp ms
+  isTrialActive: boolean;
+  credits: number;
+  secondBrainId?: string;
+  status: "Active Trial" | "Expired Demo" | "Converted to Paid";
+  notes?: string;
+}
 
-  const [searchKeyword, setSearchKeyword] = useState<string>("");
-  const [selectedStory, setSelectedStory] = useState<CommunityNewsStory | null>(null);
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [likedIds, setLikedIds] = useState<string[]>([]);
+export type SubscriptionPaymentStatus = "Pending Approval" | "Manual Payment Confirmed" | "Active";
 
-  useEffect(() => {
-    const handleUpdate = () => {
-      const all = getCommunityNews();
-      const published = all.filter((s) => s.status === "published" || s.status === "featured");
-      published.sort((a, b) => b.timestamp - a.timestamp);
-      setAllStories(published);
-    };
-    window.addEventListener("961ai_community_news_updated", handleUpdate);
-    return () => window.removeEventListener("961ai_community_news_updated", handleUpdate);
-  }, []);
+export interface ConfirmedSubscriber {
+  id: string;
+  email: string;
+  name: string;
+  phone?: string;
+  affiliation?: string;
+  plan: string;
+  amountPaid: string;
+  paymentMethod: "OMT" | "WHISH" | "USDT (TRC20)";
+  paymentRef: string;
+  confirmedAt: string;
+  expiresAt: string;
+  paymentStatus: SubscriptionPaymentStatus;
+  salesContactStatus: "Pending Contact" | "Contacted" | "Onboarded";
+  salesNotes?: string;
+}
 
-  const filteredStories = useMemo(() => {
-    const q = searchKeyword.toLowerCase().trim();
-    if (!q) {
-      return allStories.slice(0, 4);
-    }
-    return allStories.filter((story) => {
-      return (
-        story.title.toLowerCase().includes(q) ||
-        story.excerpt.toLowerCase().includes(q) ||
-        story.content.toLowerCase().includes(q) ||
-        story.category.toLowerCase().includes(q) ||
-        story.entityName.toLowerCase().includes(q) ||
-        story.authorName.toLowerCase().includes(q) ||
-        (story.tags && story.tags.some((t) => t.toLowerCase().includes(q)))
-      );
-    });
-  }, [allStories, searchKeyword]);
-
-  const handleOpenStory = (story: CommunityNewsStory) => {
-    setSelectedStory(story);
-    incrementCommunityNewsViews(story.id);
-  };
-
-  const handleLike = (storyId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (likedIds.includes(storyId)) return;
-    const newLikes = likeCommunityNewsStory(storyId);
-    setLikedIds((prev) => [...prev, storyId]);
-    setAllStories((prev) =>
-      prev.map((s) => (s.id === storyId ? { ...s, likesCount: newLikes } : s))
-    );
-    if (selectedStory && selectedStory.id === storyId) {
-      setSelectedStory({ ...selectedStory, likesCount: newLikes });
-    }
-  };
-
-  const handleShare = (story: CommunityNewsStory, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const url = typeof window !== "undefined" ? `${window.location.origin}/community-news#${story.slug}` : "";
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(url || story.title);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2200);
-    }
-  };
-
-  const getCategoryColor = (category: CommunityNewsStory["category"]) => {
-    switch (category) {
-      case "Funding Round":
-        return "bg-amber-100 text-amber-900 border-amber-300";
-      case "AI & DeepTech":
-        return "bg-emerald-100 text-emerald-900 border-emerald-300";
-      case "Startup Launch":
-        return "bg-indigo-100 text-indigo-900 border-indigo-300";
-      case "Grants & Awards":
-        return "bg-purple-100 text-purple-900 border-purple-300";
-      case "Partnership":
-        return "bg-blue-100 text-blue-900 border-blue-300";
-      case "Community & Talent":
-        return "bg-rose-100 text-rose-900 border-rose-300";
-      default:
-        return "bg-slate-100 text-slate-800 border-slate-300";
-    }
-  };
-
-  return (
-    <section 
-      id="community-news-home-section" 
-      className="rounded-2xl bg-white border-2 border-[#D7E7D6] p-5 sm:p-7 shadow-sm space-y-6 font-sans transition-all"
-    >
-      {/* Header with Title and the Two Requested Buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#D7E7D6]">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black uppercase tracking-wider bg-[#EBF3EA] text-[#2E5A2C] border border-[#B0CFAD] flex items-center gap-1.5">
-              <Newspaper className="w-3 h-3 text-[#4D7D4B]" />
-              <span>Ecosystem Wire • On (Y)Our Agenda</span>
-            </span>
-            <span className="flex items-center gap-1 text-[11px] font-mono text-emerald-700 font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Latest 4 Published
-            </span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            On (Y)Our Agenda
-          </h2>
-          <p className="text-xs text-slate-600 max-w-2xl font-medium leading-relaxed">
-            What's on our agenda & your agenda: direct dispatches, seed funding announcements, AI breakthroughs, and research spin-outs authored by Lebanese founders and researchers.
-          </p>
-        </div>
-
-        {/* The Two Requested Action Buttons */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          {/* Button 1: Read More -> Takes user to the dedicated On (Y)Our Agenda page */}
-          <button
-            id="community-news-read-more-btn"
-            onClick={onNavigateToCommunityNews}
-            className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm border-2 border-slate-300 hover:border-slate-800 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer group"
-          >
-            <span>Read More</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-
-          {/* Button 2: List Your News for free -> Takes user to the submission page */}
-          <button
-            id="community-news-list-free-btn"
-            onClick={onNavigateToSubmitNews}
-            className="px-4 py-2.5 rounded-xl bg-[#4D7D4B] hover:bg-[#3D633C] text-white font-bold text-xs sm:text-sm shadow-sm transition-all flex items-center gap-2 cursor-pointer transform active:scale-98"
-          >
-            <PlusCircle className="w-4 h-4 text-emerald-200" />
-            <span>List Your News for free</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Text Search Input Field for Keyword Filtering */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#F4F9F4] border border-[#D7E7D6] rounded-xl p-2.5">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-[#4D7D4B] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            id="community-news-keyword-search"
-            type="text"
-            placeholder="Search community news by keyword (e.g. AI, funding, healthtech, Berytech, Cedars)..."
-            value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
-            className="w-full bg-white border border-[#C5DEC3] rounded-lg pl-9 pr-8 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4D7D4B]/30 focus:border-[#4D7D4B] shadow-2xs"
-          />
-          {searchKeyword && (
-            <button
-              onClick={() => setSearchKeyword("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 cursor-pointer"
-              title="Clear search"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {searchKeyword.trim() && (
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-600 px-2 shrink-0">
-            <span>Found <strong>{filteredStories.length}</strong> matching {filteredStories.length === 1 ? "article" : "articles"}</span>
-            <button
-              onClick={() => setSearchKeyword("")}
-              className="text-xs text-[#2E5A2C] underline hover:text-[#1E3E1D] font-bold cursor-pointer"
-            >
-              Clear
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* News Cards Grid or Empty Search State */}
-      {filteredStories.length === 0 ? (
-        <div className="py-12 px-4 text-center rounded-xl bg-[#F9FCF9] border border-dashed border-[#C5DEC3] space-y-3">
-          <Newspaper className="w-9 h-9 text-[#75AC73] mx-auto opacity-70" />
-          <div className="space-y-1">
-            <h4 className="text-sm font-bold text-slate-800">No community news found matching "{searchKeyword}"</h4>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Try different keywords or check out all published articles on the main agenda wire.
-            </p>
-          </div>
-          <div className="flex items-center justify-center gap-2 pt-1">
-            <button
-              onClick={() => setSearchKeyword("")}
-              className="px-3.5 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold cursor-pointer"
-            >
-              Reset Filter
-            </button>
-            <button
-              onClick={onNavigateToSubmitNews}
-              className="px-3.5 py-1.5 rounded-lg bg-[#4D7D4B] hover:bg-[#3D633C] text-white text-xs font-bold cursor-pointer"
-            >
-              Submit This Story
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {filteredStories.map((story, index) => (
-            <article
-              key={story.id}
-              onClick={() => handleOpenStory(story)}
-              className="group rounded-xl bg-[#FAFCFA] hover:bg-white border border-[#D7E7D6] hover:border-[#4D7D4B] p-4 flex flex-col justify-between space-y-3 transition-all duration-200 hover:shadow-md cursor-pointer relative overflow-hidden"
-            >
-              {/* Top Tag and Date */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider border ${getCategoryColor(story.category)}`}>
-                    {story.category}
-                  </span>
-                  <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3 text-slate-400" />
-                      {story.publishedAt.split(",")[0]}
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-slate-400" />
-                      {story.readTime}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Title */}
-                <h3 className="text-sm font-black text-slate-900 group-hover:text-[#2E5A2C] transition-colors leading-snug line-clamp-2">
-                  {story.title}
-                </h3>
-
-                {/* Excerpt */}
-                <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">
-                  {story.excerpt}
-                </p>
-              </div>
-
-              {/* Author & Entity Footer */}
-              <div className="pt-3 border-t border-[#E6EFE5] flex items-center justify-between text-xs text-slate-600">
-                <div className="flex items-center gap-1.5 truncate max-w-[70%]">
-                  <div className="w-5 h-5 rounded-full bg-[#EBF3EA] text-[#2E5A2C] flex items-center justify-center font-bold text-[10px] shrink-0">
-                    {story.authorName.charAt(0)}
-                  </div>
-                  <div className="truncate">
-                    <span className="font-bold text-slate-900 text-[11px] block truncate">
-                      {story.authorName}
-                    </span>
-                    <span className="text-[10px] text-slate-500 block truncate font-mono">
-                      {story.entityName}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Action icons (WhatsApp, Telegram, Likes & Read More link) */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <SocialShareButtons
-                    title={story.title}
-                    excerpt={story.excerpt}
-                    url={typeof window !== "undefined" ? `${window.location.origin}/community-news#${story.slug}` : undefined}
-                    variant="card"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={(e) => handleLike(story.id, e)}
-                    className={`flex items-center gap-1 text-[11px] font-mono transition-colors ${
-                      likedIds.includes(story.id) ? "text-rose-600 font-bold" : "text-slate-400 hover:text-rose-500"
-                    }`}
-                    title="Upvote story"
-                  >
-                    <Heart className={`w-3.5 h-3.5 ${likedIds.includes(story.id) ? "fill-rose-600" : ""}`} />
-                    <span>{story.likesCount}</span>
-                  </button>
-
-                  <div className="text-[11px] font-mono font-bold text-[#4D7D4B] group-hover:translate-x-0.5 transition-transform flex items-center">
-                    <span>Read</span>
-                    <ArrowRight className="w-3 h-3 ml-0.5" />
-                  </div>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-
-      {/* Section Alert Sharing Bar */}
-      <SocialShareButtons
-        title="On (Y)Our Agenda: Lebanon & Diaspora AI Community News Wire"
-        excerpt="Breaking startup funding deals, AI agent deployments, academic research, and deeptech news across the Lebanese ecosystem."
-        url={typeof window !== "undefined" ? `${window.location.origin}/community-news` : undefined}
-        variant="section"
-      />
-
-      {/* Bottom Ribbon with quick summary CTA */}
-      <div className="p-3.5 rounded-xl bg-[#EBF3EA] border border-[#B0CFAD] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5 text-slate-800">
-          <div className="w-7 h-7 rounded-lg bg-[#4D7D4B] text-white flex items-center justify-center shrink-0">
-            <Sparkles className="w-4 h-4" />
-          </div>
-          <div>
-            <strong className="text-slate-950 block">Are you a Lebanese startup, lab, or founder?</strong>
-            <span className="text-slate-600">List your launch, funding round, or research article for free across the 961AI network.</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={onNavigateToSubmitNews}
-            className="px-3.5 py-1.5 rounded-lg bg-[#2E5A2C] hover:bg-[#1E3E1D] text-white font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span>List Your News for free</span>
-          </button>
-          <button
-            onClick={onNavigateToCommunityNews}
-            className="px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-800 font-semibold text-xs border border-[#B0CFAD] transition-colors cursor-pointer"
-          >
-            <span>Explore On (Y)Our Agenda ({getCommunityNews().length})</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Story Reader Modal */}
-      {selectedStory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
-          <div className="bg-white border-2 border-[#B0CFAD] rounded-2xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl space-y-5 relative max-h-[90vh] overflow-y-auto">
-            {/* Close Button */}
-            <button
-              onClick={() => setSelectedStory(null)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {/* Modal Header */}
-            <div className="space-y-2.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider border ${getCategoryColor(selectedStory.category)}`}>
-                  {selectedStory.category}
-                </span>
-                <span className="text-xs font-mono text-slate-500">
-                  {selectedStory.publishedAt} • {selectedStory.readTime}
-                </span>
-                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold border border-emerald-200">
-                  ✓ Verified Community Dispatch
-                </span>
-              </div>
-
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
-                {selectedStory.title}
-              </h2>
-
-              <div className="flex items-center gap-3 pt-1 text-xs text-slate-600">
-                <div className="flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="font-bold text-slate-900">{selectedStory.authorName}</span>
-                  <span className="text-slate-500">({selectedStory.authorRole})</span>
-                </div>
-                <span>•</span>
-                <div className="flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="font-medium text-slate-700">{selectedStory.entityName}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Founder Quote Box if present */}
-            {selectedStory.founderQuote && (
-              <div className="p-3.5 rounded-xl bg-emerald-50 border-l-4 border-[#4D7D4B] text-xs italic text-emerald-950 font-serif leading-relaxed">
-                "{selectedStory.founderQuote}"
-              </div>
-            )}
-
-            {/* Body Content */}
-            <div className="space-y-3 text-xs sm:text-sm text-slate-700 leading-relaxed font-sans border-t border-b border-slate-100 py-4">
-              {selectedStory.content.split("\n\n").map((para, i) => (
-                <p key={i}>{para}</p>
-              ))}
-            </div>
-
-            {/* Tags */}
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {selectedStory.tags.map((tag, i) => (
-                <span key={i} className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-mono">
-                  {tag}
-                </span>
-              ))}
-            </div>
-
-            {/* WhatsApp, Telegram & Social Alert Share */}
-            <SocialShareButtons
-              title={selectedStory.title}
-              excerpt={selectedStory.excerpt}
-              url={typeof window !== "undefined" ? `${window.location.origin}/community-news#${selectedStory.slug}` : undefined}
-              variant="modal"
-            />
-
-            {/* Modal Actions */}
-            <div className="pt-2 flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={(e) => handleLike(selectedStory.id, e)}
-                  className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 font-mono text-xs transition-colors cursor-pointer ${
-                    likedIds.includes(selectedStory.id)
-                      ? "bg-rose-50 border-rose-300 text-rose-700 font-bold"
-                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <Heart className={`w-3.5 h-3.5 ${likedIds.includes(selectedStory.id) ? "fill-rose-600 text-rose-600" : ""}`} />
-                  <span>{selectedStory.likesCount} Upvotes</span>
-                </button>
-
-                <button
-                  onClick={(e) => handleShare(selectedStory, e)}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-mono text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Share2 className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{copiedLink ? "Link Copied!" : "Share Link"}</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {selectedStory.externalSourceUrl && (
-                  <a
-                    href={selectedStory.externalSourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs flex items-center gap-1 transition-colors"
-                  >
-                    <span>Source Website</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                )}
-                <button
-                  onClick={() => {
-                    setSelectedStory(null);
-                    onNavigateToCommunityNews();
-                  }}
-                  className="px-4 py-1.5 rounded-xl bg-[#4D7D4B] hover:bg-[#3D633C] text-white font-bold text-xs transition-colors cursor-pointer"
-                >
-                  Go to Community News Page
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </section>
-  );
+const STORAGE_KEYS = {
+  MAILING_LIST: "961ai_mailing_list",
+  TRIAL_USERS: "961ai_trial_users",
+  CONFIRMED_SUBSCRIBERS: "961ai_confirmed_subscribers",
+  REGISTERED_ACCOUNTS: "961ai_registered_users",
+  AUTH_USER: "961ai_auth_user"
 };
+
+// Seed Data for Mailing List
+const SEED_MAILING_LIST: MailingListRegistration[] = [
+  {
+    id: "mail_1",
+    email: "tariq.nader@polytechnique.fr",
+    name: "Dr. Tariq Nader",
+    role: "AI Guru / Researcher",
+    affiliation: "École Polytechnique / PhoeniciaAI",
+    source: "Hero Mailing List (Early Opt-In)",
+    subscribedAt: "2026-08-20 10:14",
+    status: "Verified",
+    gdprConsent: true,
+    notes: "Lead researcher on Arabic LLM quantization."
+  },
+  {
+    id: "mail_2",
+    email: "samir.matar@aub.edu.lb",
+    name: "Prof. Samir Matar",
+    role: "Stakeholder / Academic",
+    affiliation: "AUB AI Research Lab",
+    source: "Newsletter Footer (Lead Capture)",
+    subscribedAt: "2026-08-28 11:20",
+    status: "Active",
+    gdprConsent: true,
+    notes: "Subscribed to Lebanon AI & DeepTech Dispatch."
+  },
+  {
+    id: "mail_3",
+    email: "layla.kassir@beirut-ai.org",
+    name: "Layla Kassir",
+    role: "Community Lead",
+    affiliation: "Beirut AI Collective",
+    source: "Mailing List (Hero Bar)",
+    subscribedAt: "2026-09-02 14:05",
+    status: "Verified",
+    gdprConsent: true,
+    notes: "Requested monthly GPU and hackathon bulletins."
+  },
+  {
+    id: "mail_4",
+    email: "ziad.elkhoury@alumni.mit.edu",
+    name: "Ziad El Khoury",
+    role: "Diaspora Founder",
+    affiliation: "Boston-Beirut AI Bridge",
+    source: "Hero Lead Bar (Auto Opt-In)",
+    subscribedAt: "2026-09-05 09:30",
+    status: "Active",
+    gdprConsent: true,
+    notes: "Interested in sovereign LLM hosting & sandboxes."
+  }
+];
+
+// Seed Data for Trial Users (Free 6-Hour Demo)
+const SEED_TRIAL_USERS: TrialUser[] = [
+  {
+    id: "trial_1",
+    email: "kareem.chahine@beirutangels.vc",
+    name: "Kareem Chahine",
+    role: "Investor",
+    affiliation: "Beirut Diaspora Capital",
+    whatsappPhone: "+961 70 882 119",
+    registeredAt: "2026-09-12 16:20",
+    demoExpiresAt: Date.now() + 3.5 * 3600 * 1000, // active trial
+    isTrialActive: true,
+    credits: 50,
+    secondBrainId: "ws_kareem_angel",
+    status: "Active Trial",
+    notes: "Evaluating 5 Lebanon deeptech startups on platform."
+  },
+  {
+    id: "trial_2",
+    email: "maya.khoury@hellotree.dev",
+    name: "Maya Khoury",
+    role: "Agency Lead",
+    affiliation: "Hellotree Digital Beirut",
+    whatsappPhone: "+961 71 445 231",
+    registeredAt: "2026-09-10 11:15",
+    demoExpiresAt: Date.now() - 48 * 3600 * 1000, // expired trial
+    isTrialActive: false,
+    credits: 12,
+    secondBrainId: "ws_hellotree_dev",
+    status: "Expired Demo",
+    notes: "Demo completed. Looking to upgrade via Whish Money."
+  },
+  {
+    id: "trial_3",
+    email: "rami.ghosn@cedarcloud.lb",
+    name: "Rami Ghosn",
+    role: "Founder",
+    affiliation: "CedarCloud Serverless",
+    whatsappPhone: "+961 03 992 410",
+    registeredAt: "2026-09-14 08:45",
+    demoExpiresAt: Date.now() + 5.2 * 3600 * 1000, // active trial
+    isTrialActive: true,
+    credits: 50,
+    secondBrainId: "ws_rami_cloud",
+    status: "Active Trial",
+    notes: "Testing 0% Offshore S.A.L. calculator & directory."
+  },
+  {
+    id: "trial_4",
+    email: "jad.bouhabib@beirutlab.ai",
+    name: "Jad Bou Habib",
+    role: "AI Developer",
+    affiliation: "Beirut Vision Labs",
+    whatsappPhone: "+961 81 229 004",
+    registeredAt: "2026-09-08 19:10",
+    demoExpiresAt: Date.now() - 72 * 3600 * 1000, // expired trial
+    isTrialActive: false,
+    credits: 0,
+    secondBrainId: "ws_jad_vision",
+    status: "Expired Demo",
+    notes: "Reached demo limit. Sent automated upgrade prompt."
+  }
+];
+
+// Seed Data for Confirmed Subscribers (Paid $100/yr via OMT / Whish / USDT)
+const SEED_CONFIRMED_SUBSCRIBERS: ConfirmedSubscriber[] = [
+  {
+    id: "sub_paid_1",
+    email: "nour.haddad@cedarshealth.ai",
+    name: "Nour Haddad",
+    phone: "+961 81 041 334",
+    affiliation: "CedarsHealth AI / Founder",
+    plan: "Annual Pro ($100/yr)",
+    amountPaid: "$100 USD",
+    paymentMethod: "WHISH",
+    paymentRef: "WHISH-961-88492-X",
+    confirmedAt: "2026-09-11 14:30",
+    expiresAt: "2027-09-11 14:30",
+    paymentStatus: "Active",
+    salesContactStatus: "Onboarded",
+    salesNotes: "Full payment received via Whish Money. 2,500 credits loaded."
+  },
+  {
+    id: "sub_paid_2",
+    email: "anthony.salameh@levantventure.com",
+    name: "Anthony Salameh",
+    phone: "+961 70 119 550",
+    affiliation: "Levant Venture Partners",
+    plan: "Annual Pro ($100/yr)",
+    amountPaid: "$100 USD",
+    paymentMethod: "OMT",
+    paymentRef: "OMT-BEY-440291-B",
+    confirmedAt: "2026-09-13 10:15",
+    expiresAt: "2027-09-13 10:15",
+    paymentStatus: "Active",
+    salesContactStatus: "Contacted",
+    salesNotes: "OMT Cash transfer confirmed by finance desk. Sales team confirmed syndicate access."
+  },
+  {
+    id: "sub_paid_3",
+    email: "fadi.makdissi@phoeniciatech.sal",
+    name: "Fadi Makdissi",
+    phone: "+961 03 552 918",
+    affiliation: "Phoenicia Tech S.A.L.",
+    plan: "Annual Pro ($100/yr)",
+    amountPaid: "$100 USD",
+    paymentMethod: "WHISH",
+    paymentRef: "WHISH-LB-771890",
+    confirmedAt: "2026-09-14 18:00",
+    expiresAt: "2027-09-14 18:00",
+    paymentStatus: "Pending Approval",
+    salesContactStatus: "Pending Contact",
+    salesNotes: "User upgraded via Whish Money. Manual settlement receipt submitted; pending approval."
+  },
+  {
+    id: "sub_paid_4",
+    email: "elena.mansour@diasporacap.org",
+    name: "Elena Mansour",
+    phone: "+1 617 892 4410",
+    affiliation: "Boston Diaspora Syndicate",
+    plan: "Annual Pro ($100/yr)",
+    amountPaid: "$100 USD",
+    paymentMethod: "USDT (TRC20)",
+    paymentRef: "TRC20-0x9a88fbc23190e7",
+    confirmedAt: "2026-09-09 12:00",
+    expiresAt: "2027-09-09 12:00",
+    paymentStatus: "Manual Payment Confirmed",
+    salesContactStatus: "Onboarded",
+    salesNotes: "On-chain verification complete. Manual payment confirmed."
+  }
+];
+
+// ================= MAILING LIST CRUD =================
+export function getMailingListRegistrations(): MailingListRegistration[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.MAILING_LIST);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.MAILING_LIST, JSON.stringify(SEED_MAILING_LIST));
+      return SEED_MAILING_LIST;
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem(STORAGE_KEYS.MAILING_LIST, JSON.stringify(SEED_MAILING_LIST));
+      return SEED_MAILING_LIST;
+    }
+    return parsed;
+  } catch {
+    return SEED_MAILING_LIST;
+  }
+}
+
+export function addMailingListRegistration(
+  email: string,
+  name?: string,
+  role?: string,
+  affiliation?: string,
+  source = "Hero Mailing List",
+  notes?: string
+): MailingListRegistration {
+  const cleanEmail = (email || "").trim().toLowerCase();
+  const list = getMailingListRegistrations();
+  const existingIndex = list.findIndex((m) => m.email.toLowerCase() === cleanEmail);
+
+  const nowStr = new Date().toISOString().replace("T", " ").substring(0, 16);
+
+  if (existingIndex >= 0) {
+    const updated = {
+      ...list[existingIndex],
+      name: name?.trim() || list[existingIndex].name,
+      role: role || list[existingIndex].role,
+      affiliation: affiliation || list[existingIndex].affiliation,
+      notes: notes ? `${list[existingIndex].notes || ""} | ${notes}` : list[existingIndex].notes,
+      status: "Active" as const
+    };
+    list[existingIndex] = updated;
+    localStorage.setItem(STORAGE_KEYS.MAILING_LIST, JSON.stringify(list));
+    return updated;
+  }
+
+  const newItem: MailingListRegistration = {
+    id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    email: cleanEmail,
+    name: name?.trim() || cleanEmail.split("@")[0],
+    role: role || "Ecosystem Subscriber",
+    affiliation: affiliation || "961AI Network Member",
+    source,
+    subscribedAt: nowStr,
+    status: "Active",
+    gdprConsent: true,
+    notes: notes || "Registered via 961AI mailing list opt-in."
+  };
+
+  list.unshift(newItem);
+  localStorage.setItem(STORAGE_KEYS.MAILING_LIST, JSON.stringify(list));
+  return newItem;
+}
+
+export function deleteMailingListRegistration(id: string): void {
+  const list = getMailingListRegistrations().filter((m) => m.id !== id);
+  localStorage.setItem(STORAGE_KEYS.MAILING_LIST, JSON.stringify(list));
+}
+
+export function toggleMailingListStatus(id: string): void {
+  const list = getMailingListRegistrations();
+  const idx = list.findIndex((m) => m.id === id);
+  if (idx >= 0) {
+    list[idx].status = list[idx].status === "Verified" ? "Active" : list[idx].status === "Active" ? "Unsubscribed" : "Verified";
+    localStorage.setItem(STORAGE_KEYS.MAILING_LIST, JSON.stringify(list));
+  }
+}
+
+// ================= TRIAL USERS CRUD =================
+export function getTrialUsers(): TrialUser[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.TRIAL_USERS);
+    let list: TrialUser[] = raw ? JSON.parse(raw) : [];
+
+    if (!Array.isArray(list) || list.length === 0) {
+      list = SEED_TRIAL_USERS;
+      localStorage.setItem(STORAGE_KEYS.TRIAL_USERS, JSON.stringify(list));
+    }
+
+    // Auto-sync with 961ai_registered_users
+    try {
+      const regRaw = localStorage.getItem(STORAGE_KEYS.REGISTERED_ACCOUNTS);
+      if (regRaw) {
+        const regAccounts = JSON.parse(regRaw);
+        let updated = false;
+
+        regAccounts.forEach((acc: any) => {
+          const email = (acc.email || "").trim().toLowerCase();
+          if (!email) return;
+
+          // Check if this account is already in trial list
+          const exists = list.find((t) => t.email.toLowerCase() === email);
+          const isPremium = acc.session?.isPremium || false;
+
+          if (!exists && !isPremium) {
+            const demoExpires = acc.session?.demoExpiresAt || Date.now() + 6 * 3600 * 1000;
+            const isTrialActive = demoExpires > Date.now();
+
+            list.unshift({
+              id: `trial_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              email,
+              name: acc.name || acc.session?.name || email.split("@")[0],
+              role: acc.role || acc.session?.role || "Founder",
+              affiliation: acc.affiliation || acc.session?.affiliation || "Independent Tech Leader",
+              whatsappPhone: acc.session?.whatsapp_phone || "",
+              registeredAt: new Date(acc.session?.createdAt || Date.now()).toISOString().replace("T", " ").substring(0, 16),
+              demoExpiresAt: demoExpires,
+              isTrialActive,
+              credits: acc.session?.credits ?? 50,
+              secondBrainId: acc.session?.z961_second_brain_id || `ws_${email.split("@")[0]}`,
+              status: isTrialActive ? "Active Trial" : "Expired Demo",
+              notes: "Signed up via platform registration modal."
+            });
+            updated = true;
+          }
+        });
+
+        if (updated) {
+          localStorage.setItem(STORAGE_KEYS.TRIAL_USERS, JSON.stringify(list));
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return list;
+  } catch {
+    return SEED_TRIAL_USERS;
+  }
+}
+
+export function addTrialUser(user: Partial<TrialUser> & { email: string; name: string }): TrialUser {
+  const list = getTrialUsers();
+  const cleanEmail = user.email.trim().toLowerCase();
+  const now = Date.now();
+  const demoExpiresAt = user.demoExpiresAt || now + 6 * 3600 * 1000;
+
+  const newTrial: TrialUser = {
+    id: `trial_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    email: cleanEmail,
+    name: user.name.trim(),
+    role: user.role || "Founder",
+    affiliation: user.affiliation || "Independent Tech Leader",
+    whatsappPhone: user.whatsappPhone || "",
+    registeredAt: new Date().toISOString().replace("T", " ").substring(0, 16),
+    demoExpiresAt,
+    isTrialActive: demoExpiresAt > now,
+    credits: user.credits ?? 50,
+    secondBrainId: user.secondBrainId || `ws_${cleanEmail.split("@")[0]}`,
+    status: demoExpiresAt > now ? "Active Trial" : "Expired Demo",
+    notes: user.notes || "Free 6-hour demo session started."
+  };
+
+  const existingIndex = list.findIndex((t) => t.email.toLowerCase() === cleanEmail);
+  if (existingIndex >= 0) {
+    list[existingIndex] = newTrial;
+  } else {
+    list.unshift(newTrial);
+  }
+
+  localStorage.setItem(STORAGE_KEYS.TRIAL_USERS, JSON.stringify(list));
+  return newTrial;
+}
+
+export function extendTrialTime(id: string, hoursToAdd = 24): void {
+  const list = getTrialUsers();
+  const idx = list.findIndex((t) => t.id === id);
+  if (idx >= 0) {
+    const currentExpiry = Math.max(list[idx].demoExpiresAt, Date.now());
+    list[idx].demoExpiresAt = currentExpiry + hoursToAdd * 3600 * 1000;
+    list[idx].isTrialActive = true;
+    list[idx].status = "Active Trial";
+    list[idx].credits = (list[idx].credits || 0) + 100;
+    list[idx].notes = `${list[idx].notes || ""} | Trial extended +${hoursToAdd}h by Admin.`;
+    localStorage.setItem(STORAGE_KEYS.TRIAL_USERS, JSON.stringify(list));
+  }
+}
+
+export function deleteTrialUser(id: string): void {
+  const list = getTrialUsers().filter((t) => t.id !== id);
+  localStorage.setItem(STORAGE_KEYS.TRIAL_USERS, JSON.stringify(list));
+}
+
+// ================= CONFIRMED SUBSCRIBERS CRUD =================
+export function getConfirmedSubscribers(): ConfirmedSubscriber[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS, JSON.stringify(SEED_CONFIRMED_SUBSCRIBERS));
+      return SEED_CONFIRMED_SUBSCRIBERS;
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS, JSON.stringify(SEED_CONFIRMED_SUBSCRIBERS));
+      return SEED_CONFIRMED_SUBSCRIBERS;
+    }
+    return parsed;
+  } catch {
+    return SEED_CONFIRMED_SUBSCRIBERS;
+  }
+}
+
+export function addConfirmedSubscriber(
+  sub: {
+    email: string;
+    name?: string;
+    phone?: string;
+    affiliation?: string;
+    paymentMethod: "OMT" | "WHISH" | "USDT (TRC20)";
+    paymentRef?: string;
+    amountPaid?: string;
+    paymentStatus?: SubscriptionPaymentStatus;
+  }
+): ConfirmedSubscriber {
+  const list = getConfirmedSubscribers();
+  const cleanEmail = (sub.email || "").trim().toLowerCase();
+  const now = new Date();
+  const oneYearLater = new Date(now.getTime() + 365 * 24 * 3600 * 1000);
+
+  const confirmedItem: ConfirmedSubscriber = {
+    id: `sub_paid_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    email: cleanEmail,
+    name: sub.name?.trim() || cleanEmail.split("@")[0],
+    phone: sub.phone || "+961 81 041 334",
+    affiliation: sub.affiliation || "961AI Network Member",
+    plan: "Annual Pro ($100/yr)",
+    amountPaid: sub.amountPaid || "$100 USD",
+    paymentMethod: sub.paymentMethod,
+    paymentRef: sub.paymentRef?.trim() || `${sub.paymentMethod}-${Date.now().toString().slice(-6)}`,
+    confirmedAt: now.toISOString().replace("T", " ").substring(0, 16),
+    expiresAt: oneYearLater.toISOString().replace("T", " ").substring(0, 16),
+    paymentStatus: sub.paymentStatus || (sub.paymentMethod === "USDT (TRC20)" ? "Manual Payment Confirmed" : "Pending Approval"),
+    salesContactStatus: "Pending Contact",
+    salesNotes: `Subscribed via ${sub.paymentMethod}. Sales team notification generated.`
+  };
+
+  const existingIdx = list.findIndex((s) => s.email.toLowerCase() === cleanEmail);
+  if (existingIdx >= 0) {
+    list[existingIdx] = confirmedItem;
+  } else {
+    list.unshift(confirmedItem);
+  }
+
+  localStorage.setItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS, JSON.stringify(list));
+
+  // If user is also in trial list, mark as Converted to Paid
+  try {
+    const trials = getTrialUsers();
+    const trialIdx = trials.findIndex((t) => t.email.toLowerCase() === cleanEmail);
+    if (trialIdx >= 0) {
+      trials[trialIdx].status = "Converted to Paid";
+      trials[trialIdx].notes = `Upgraded to Annual Pro via ${sub.paymentMethod}.`;
+      localStorage.setItem(STORAGE_KEYS.TRIAL_USERS, JSON.stringify(trials));
+    }
+  } catch {
+    // ignore
+  }
+
+  return confirmedItem;
+}
+
+export function updateSubscriptionPaymentStatus(
+  id: string,
+  newStatus: SubscriptionPaymentStatus,
+  options: { triggerNotification?: boolean; autoSendNotification?: boolean } = { triggerNotification: true }
+): ConfirmedSubscriber | null {
+  const list = getConfirmedSubscribers();
+  const idx = list.findIndex((s) => s.id === id);
+  if (idx >= 0) {
+    const prevStatus = list[idx].paymentStatus;
+    list[idx].paymentStatus = newStatus;
+    list[idx].salesNotes = `${list[idx].salesNotes || ""} | Payment status shifted to ${newStatus} on ${new Date().toISOString().substring(0, 10)}.`;
+    localStorage.setItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS, JSON.stringify(list));
+
+    // Auto trigger notification into queue if status changed and option enabled
+    if (options.triggerNotification !== false && prevStatus !== newStatus) {
+      try {
+        triggerNotificationForSubscriberStatus({
+          userId: list[idx].id,
+          userName: list[idx].name,
+          userEmail: list[idx].email,
+          userPhone: list[idx].phone,
+          userPlan: list[idx].plan,
+          paymentMethod: list[idx].paymentMethod,
+          paymentRef: list[idx].paymentRef,
+          amount: list[idx].amountPaid,
+          newStatus,
+          channel: "email",
+          autoSend: options.autoSendNotification ?? false
+        });
+      } catch (err) {
+        console.error("Failed to enqueue notification:", err);
+      }
+    }
+
+    return list[idx];
+  }
+  return null;
+}
+
+export function updateSalesContactStatus(
+  id: string,
+  newStatus: ConfirmedSubscriber["salesContactStatus"]
+): void {
+  const list = getConfirmedSubscribers();
+  const idx = list.findIndex((s) => s.id === id);
+  if (idx >= 0) {
+    list[idx].salesContactStatus = newStatus;
+    list[idx].salesNotes = `${list[idx].salesNotes || ""} | Status changed to ${newStatus} on ${new Date().toISOString().substring(0, 10)}.`;
+    localStorage.setItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS, JSON.stringify(list));
+  }
+}
+
+export function deleteConfirmedSubscriber(id: string): void {
+  const list = getConfirmedSubscribers().filter((s) => s.id !== id);
+  localStorage.setItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS, JSON.stringify(list));
+}
+
+// Global combined export
+export function exportAllRegisteredUsersCsv(): string {
+  const mailing = getMailingListRegistrations();
+  const trials = getTrialUsers();
+  const confirmed = getConfirmedSubscribers();
+
+  const lines: string[] = [
+    "--- CATEGORY 1: REGISTERED ON MAILING LIST ---",
+    "ID,Name,Email,Role,Affiliation,Source,SubscribedAt,Status,GDPR",
+    ...mailing.map((m) => `"${m.id}","${m.name}","${m.email}","${m.role || ''}","${m.affiliation || ''}","${m.source}","${m.subscribedAt}","${m.status}","${m.gdprConsent ? 'Yes' : 'No'}"`),
+    "",
+    "--- CATEGORY 2: USERS ON FREE TRIAL ---",
+    "ID,Name,Email,Role,Affiliation,WhatsApp,RegisteredAt,Status,Credits",
+    ...trials.map((t) => `"${t.id}","${t.name}","${t.email}","${t.role}","${t.affiliation}","${t.whatsappPhone || ''}","${t.registeredAt}","${t.status}","${t.credits}"`),
+    "",
+    "--- CATEGORY 3: CONFIRMED PAID SUBSCRIBERS ---",
+    "ID,Name,Email,Phone,Affiliation,Plan,Amount,PaymentMethod,PaymentRef,ConfirmedAt,PaymentStatus,SalesStatus",
+    ...confirmed.map((c) => `"${c.id}","${c.name}","${c.email}","${c.phone || ''}","${c.affiliation || ''}","${c.plan}","${c.amountPaid}","${c.paymentMethod}","${c.paymentRef}","${c.confirmedAt}","${c.paymentStatus}","${c.salesContactStatus}"`)
+  ];
+
+  return lines.join("\n");
+}

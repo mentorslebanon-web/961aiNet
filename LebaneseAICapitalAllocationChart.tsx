@@ -1,879 +1,438 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
-import { GraphNode, GraphEdge } from "../../types";
-import * as d3 from "d3";
+import React, { useState } from "react";
+import { KnowledgeResource } from "../../types";
+import { generateReportPdf } from "../../utils/generateReportPdf";
 import { 
-  Network, 
-  ZoomIn, 
-  ZoomOut, 
-  RotateCcw, 
-  Maximize2, 
-  Filter, 
+  Printer, 
+  MessageCircle, 
+  Copy, 
+  Check, 
+  ArrowRight, 
+  ArrowLeft,
+  BookOpen, 
   Sparkles, 
-  Search, 
-  ArrowUpRight, 
-  MapPin, 
+  FileText, 
   Building2, 
-  Briefcase, 
-  Users, 
-  Globe2, 
-  Layers, 
-  Info,
-  CheckCircle2,
-  Share2
+  TrendingUp, 
+  DollarSign, 
+  ChevronLeft, 
+  ChevronRight, 
+  Flame, 
+  CheckCircle2, 
+  Mail, 
+  Send, 
+  Share2,
+  Scale,
+  Globe,
+  ShieldCheck,
+  Layers,
+  Filter,
+  Download
 } from "lucide-react";
 
-interface LebanonAiTechMapProps {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  onSelectNode: (node: GraphNode) => void;
-  onNavigateToMatchmaking?: () => void;
-  onNavigateToGraphArch?: () => void;
+interface InvestmentReportSectionProps {
+  onNavigateToInvestmentReports?: (reportId?: string) => void;
+  onNavigateToResources?: () => void;
+  onOpenResourceModal?: (resource: KnowledgeResource) => void;
+  investmentResource?: KnowledgeResource;
 }
 
-interface D3Node extends d3.SimulationNodeDatum {
-  id: string;
-  label: string;
-  type: "Startup" | "Investor" | "Guru" | "Hub" | "Skill" | string;
-  category: "startup" | "investor" | "guru" | "hub";
-  isDiaspora?: boolean;
-  location?: string;
-  country?: string;
-  title?: string;
-  bio?: string;
-  stage?: string;
-  ticketSize?: string;
-  tags?: string[];
-  connectionsCount?: number;
-  rating?: number;
-  radius: number;
-  originalNode: GraphNode;
-  x?: number;
-  y?: number;
-  vx?: number;
-  vy?: number;
-  fx?: number | null;
-  fy?: number | null;
-}
-
-interface D3Link extends d3.SimulationLinkDatum<D3Node> {
-  id: string;
-  source: string | D3Node;
-  target: string | D3Node;
-  relationship: string;
-  weight: number;
-  verified?: boolean;
-}
-
-export const LebanonAiTechMap: React.FC<LebanonAiTechMapProps> = ({
-  nodes,
-  edges,
-  onSelectNode,
-  onNavigateToMatchmaking,
-  onNavigateToGraphArch
+export const InvestmentReportSection: React.FC<InvestmentReportSectionProps> = ({
+  onNavigateToInvestmentReports,
+  onNavigateToResources,
+  onOpenResourceModal,
+  investmentResource
 }) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const [currentSlide, setCurrentSlide] = useState<number>(0);
+  const [copied, setCopied] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
 
-  // Filters & State
-  const [activeCategory, setActiveCategory] = useState<"ALL" | "STARTUPS" | "INVESTORS" | "GURUS" | "DIASPORA">("ALL");
-  const [selectedCluster, setSelectedCluster] = useState<string>("ALL");
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-  const [hoveredNode, setHoveredNode] = useState<D3Node | null>(null);
-  const [hoveredLink, setHoveredLink] = useState<D3Link | null>(null);
-  const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 900, height: 560 });
-  const [physicsActive, setPhysicsActive] = useState<boolean>(true);
-  const [highlightConnected, setHighlightConnected] = useState<boolean>(true);
+  const reports = [
+    {
+      id: "res_mena_lebanon_vc_2026",
+      key: "mena_lebanon_vc",
+      category: "Macro Trends",
+      badge: "EXECUTIVE OVERVIEW • 2026 DISPATCH",
+      tag: "MENA & Lebanon Venture Intelligence",
+      title: "Executive Overview: MENA & Lebanon Venture Capital Landscape 2026",
+      subtitle: "Capital Concentration, Top Investment Categories & Cross-Border Diaspora Models",
+      excerpt: "The MENA venture ecosystem exceeded $3B in deployed capital driven by GCC sovereign vehicles and late-stage mega-rounds. Meanwhile, Lebanon's bifurcated model pairs domestic DFI/impact backing with cross-border VC strategies.",
+      date: "August 2026",
+      publisher: "MAGNiTT, ZoomInvestors, CapLink & 961AI Intelligence",
+      bullets: [
+        "MENA total venture capital deployed exceeded $3 Billion in 2025/2026, pulling ahead of other emerging venture markets.",
+        "Over 70% of total MENA funding is absorbed by KSA and UAE, driven by sovereign wealth funds (PIF, Mubadala) and late-stage mega-rounds.",
+        "Top MENA categories: FinTech (~35%-40%), Enterprise Software & AI (~18%-22%), and E-Commerce & Logistics (~12%-15%).",
+        "Lebanon operates on a bifurcated model: Domestic Early-Stage & DFI/Impact (IM Fndng, Berytech, Globivest) vs Cross-Border VCs (B&Y, Cedar Mundi).",
+        "Outbound Strategy: Founders incorporate offshore (Delaware, UAE, UK) while maintaining Beirut R&D hubs for 3.6x engineering cost arbitrage."
+      ]
+    },
+    {
+      id: "res_lebanon_pe_vc_2026",
+      key: "pe_vc",
+      category: "Private Equity & Funds",
+      badge: "NEW REPORT • JAN 2026 EDITION",
+      tag: "Private Equity & Venture Capital",
+      title: "Lebanon Private Equity & Venture Capital Landscape 2026",
+      subtitle: "Market Overview, Deal Flow & Fund Directory",
+      excerpt: "Lebanon's private equity (PE) market is projected to reach US$586.67 million in total deal value, backed by roughly 14 active domestic PE funds and regional recovery interest. You can explore deeper metrics via the ZoomInvestors Directory.",
+      date: "January 2026",
+      publisher: "961AI Research Taskforce & ZoomInvestors",
+      bullets: [
+        "Lebanon hosts 14 active private equity funds headquartered in the country as of January 2026.",
+        "These funds have collectively invested more than $37.7 billion across 644 rounds in over 120 companies.",
+        "The average deal size in Lebanon's PE market stands at approximately US$12.16 million in 2025.",
+        "Lebanon's PE market is projected to reach US$586.67 million in total deal value in 2025, growing at a 3.43% compound annual growth rate through 2026.",
+        "Fund sizes range from the $50 million Lebanon Growth Capital Fund to Global Gate Capital's $6 billion-plus in assets under management (AUM)."
+      ]
+    },
+    {
+      id: "res_investment_report_2026",
+      key: "war_economics",
+      category: "Startup Economics",
+      badge: "2026 SPECIAL BRIEF",
+      tag: "Macroeconomics & Wartime Resilience",
+      title: "2026 Special Report: Startup Economics & Venture Capital in Times of War",
+      subtitle: "Macroeconomic Shocks, Geopolitical Volatility, and the Levantine Resilience Playbook",
+      excerpt: "Explore the comprehensive research report on navigating runway preservation, sovereign defense tech reallocations, and decoupled diaspora venture capital stacks.",
+      date: "August 2026",
+      publisher: "961AI Research Taskforce & Levant Capital Intelligence",
+      bullets: [
+        "Global military spending reached an all-time record of $2.52 Trillion in 2026 (+5.2% YoY).",
+        "Beirut tech ecosystem climbed 36 places to 341st globally with +46.3% YoY growth momentum.",
+        "Startup operating cost inflation model indicates a +23.0% burn spike (-2.8 months runway compression).",
+        "Recommended seed runway buffer of 18+ months backed by Virtual CFO (VCFO) scenario modeling."
+      ]
+    },
+    {
+      id: "res_vcfo_runway_defense_2026",
+      key: "vcfo_playbook",
+      category: "VC Strategy",
+      badge: "TACTICAL GUIDE",
+      tag: "VCFO & Burn Rate Modeling",
+      title: "Virtual CFO & Runway Resilience: The 2026 Burn-Rate Defense Guide",
+      subtitle: "Dynamic Financial Modeling & Fresh USD Payroll Guardrails",
+      excerpt: "A tactical operating guide for founders on structuring dynamic 18-month runway forecasts, establishing +20% inflation buffers, and managing dual-currency payroll without runway compression.",
+      date: "July 2026",
+      publisher: "VCFO Network & 961AI Finance Desk",
+      bullets: [
+        "Implement rolling 13-week direct cash flow forecasting to identify liquidity bottlenecks.",
+        "Segregate operating reserves into offshore yield accounts and domestic Fresh USD disbursement accounts.",
+        "Retain top engineering talent at 3.6x cost advantage with dollarized compensation."
+      ]
+    },
+    {
+      id: "res_offshore_treasury_2026",
+      key: "offshore_governance",
+      category: "Offshore & Governance",
+      badge: "LEGAL BLUEPRINT",
+      tag: "Law No. 85 & Tax Optimization",
+      title: "Decoupled Treasury Architectures: Offshore SAL & Delaware Flips",
+      subtitle: "Corporate Structuring for Capital Preservation and Diligence",
+      excerpt: "Step-by-step regulatory blueprints on executing a Delaware flip, establishing Lebanese Offshore SAL entities with 0% corporate income tax on foreign revenue, and securing clean investor onboarding.",
+      date: "June 2026",
+      publisher: "Beirut Legal Tech Group • MENA Advisory",
+      bullets: [
+        "0% corporate income tax on exported software revenues under Lebanese Law No. 85.",
+        "100% exemption from stamp duties on foreign commercial contracts and cross-border equity.",
+        "Delaware C-Corp TopCo allows Silicon Valley venture funds to deploy SAFEs seamlessly."
+      ]
+    }
+  ];
 
-  // Responsive dimensions via ResizeObserver
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width } = entry.contentRect;
-        if (width > 0) {
-          const calculatedHeight = Math.max(500, Math.min(680, Math.round(width * 0.58)));
-          setDimensions({ width, height: calculatedHeight });
-        }
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, []);
+  const activeReport = reports[currentSlide];
 
-  // Filter and prepare D3 nodes & edges
-  const { d3Nodes, d3Links, stats } = useMemo(() => {
-    // We primarily want Startups, Investors, Gurus, and Key Hubs that form the Lebanon AI Tech Map
-    const filteredSourceNodes = nodes.filter((n) => {
-      if (n.type === "Skill") return false; // skills clutter network map, focus on entities
-      
-      if (activeCategory === "STARTUPS" && n.type !== "Startup") return false;
-      if (activeCategory === "INVESTORS" && n.type !== "Investor") return false;
-      if (activeCategory === "GURUS" && n.type !== "Guru") return false;
-      if (activeCategory === "DIASPORA" && !n.isDiaspora) return false;
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
-      if (selectedCluster !== "ALL") {
-        if (selectedCluster === "beirut" && !n.location?.toLowerCase().includes("beirut") && !n.location?.toLowerCase().includes("bdd")) return false;
-        if (selectedCluster === "bay_area" && !n.location?.toLowerCase().includes("san francisco") && !n.location?.toLowerCase().includes("palo alto") && !n.location?.toLowerCase().includes("silicon")) return false;
-        if (selectedCluster === "gcc" && !n.location?.toLowerCase().includes("dubai") && !n.location?.toLowerCase().includes("riyadh") && !n.country?.toLowerCase().includes("uae") && !n.country?.toLowerCase().includes("ksa")) return false;
-        if (selectedCluster === "europe" && !n.location?.toLowerCase().includes("paris") && !n.location?.toLowerCase().includes("london") && !n.country?.toLowerCase().includes("france") && !n.country?.toLowerCase().includes("uk")) return false;
-      }
+  const handleShareWhatsApp = () => {
+    const text = encodeURIComponent(
+      `*${activeReport.title}*\n\n` +
+      `${activeReport.excerpt}\n\n` +
+      `Read the full research report on 961AI Network:\n` +
+      `${window.location.origin}/#investment-reports?report=${activeReport.id}`
+    );
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+  };
 
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesLabel = n.label.toLowerCase().includes(q);
-        const matchesBio = n.bio?.toLowerCase().includes(q);
-        const matchesTags = n.tags?.some(t => t.toLowerCase().includes(q));
-        const matchesLoc = n.location?.toLowerCase().includes(q);
-        if (!matchesLabel && !matchesBio && !matchesTags && !matchesLoc) return false;
-      }
+  const handleCopyLink = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(`${window.location.origin}/#investment-reports?report=${activeReport.id}`);
+      setCopied(true);
+      showToast("Report link copied to clipboard!");
+      setTimeout(() => setCopied(false), 2500);
+    }
+  };
 
-      return true;
-    });
-
-    const nodeIds = new Set(filteredSourceNodes.map((n) => n.id));
-
-    // Transform to D3 Simulation nodes
-    const d3NodesList: D3Node[] = filteredSourceNodes.map((n) => {
-      let category: "startup" | "investor" | "guru" | "hub" = "startup";
-      let baseRadius = 20;
-
-      if (n.type === "Startup") {
-        category = "startup";
-        baseRadius = n.mrr ? 26 : 22;
-      } else if (n.type === "Investor") {
-        category = "investor";
-        baseRadius = 28;
-      } else if (n.type === "Guru") {
-        category = "guru";
-        baseRadius = 24;
-      } else if (n.type === "Hub") {
-        category = "hub";
-        baseRadius = 30;
-      }
-
-      return {
-        id: n.id,
-        label: n.label,
-        type: n.type,
-        category,
-        isDiaspora: n.isDiaspora,
-        location: n.location,
-        country: n.country,
-        title: n.title,
-        bio: n.bio,
-        stage: n.stage,
-        ticketSize: n.ticketSize,
-        tags: n.tags,
-        connectionsCount: n.connectionsCount,
-        rating: n.rating,
-        radius: baseRadius,
-        originalNode: n
-      };
-    });
-
-    // Create synthetic and existing rich relationship links between startups, investors, and diaspora mentors
-    const rawLinks: D3Link[] = [];
-    const addedLinkKeys = new Set<string>();
-
-    // Add existing edges from database
-    edges.forEach((e) => {
-      const src = typeof e.source === "string" ? e.source : (e.source as any).id;
-      const tgt = typeof e.target === "string" ? e.target : (e.target as any).id;
-      if (nodeIds.has(src) && nodeIds.has(tgt)) {
-        const key = `${src}->${tgt}`;
-        if (!addedLinkKeys.has(key)) {
-          addedLinkKeys.add(key);
-          rawLinks.push({
-            id: e.id,
-            source: src,
-            target: tgt,
-            relationship: e.relationship,
-            weight: e.weight || 0.8,
-            verified: e.verified
-          });
-        }
-      }
-    });
-
-    // Add rich contextual links between Lebanese Startups <-> Regional Investors <-> Diaspora Gurus
-    const startups = d3NodesList.filter(n => n.category === "startup");
-    const investors = d3NodesList.filter(n => n.category === "investor");
-    const gurus = d3NodesList.filter(n => n.category === "guru");
-    const hubs = d3NodesList.filter(n => n.category === "hub");
-
-    // Connect Startups to Investors
-    startups.forEach((s, idx) => {
-      if (investors.length > 0) {
-        const targetInv = investors[idx % investors.length];
-        const key = `${targetInv.id}->${s.id}`;
-        if (!addedLinkKeys.has(key)) {
-          addedLinkKeys.add(key);
-          rawLinks.push({
-            id: `link_inv_${s.id}_${targetInv.id}`,
-            source: targetInv.id,
-            target: s.id,
-            relationship: "CAPITAL_PIPELINE",
-            weight: 0.9,
-            verified: true
-          });
-        }
-
-        // Secondary investor connection
-        if (investors.length > 1) {
-          const secondInv = investors[(idx + 2) % investors.length];
-          const key2 = `${secondInv.id}->${s.id}`;
-          if (!addedLinkKeys.has(key2)) {
-            addedLinkKeys.add(key2);
-            rawLinks.push({
-              id: `link_inv2_${s.id}_${secondInv.id}`,
-              source: secondInv.id,
-              target: s.id,
-              relationship: "SYNDICATE_BACKING",
-              weight: 0.7,
-              verified: true
-            });
-          }
-        }
-      }
-
-      // Connect Startups to Diaspora Mentors / Gurus
-      if (gurus.length > 0) {
-        const targetGuru = gurus[(idx * 2) % gurus.length];
-        const keyG = `${targetGuru.id}->${s.id}`;
-        if (!addedLinkKeys.has(keyG)) {
-          addedLinkKeys.add(keyG);
-          rawLinks.push({
-            id: `link_guru_${s.id}_${targetGuru.id}`,
-            source: targetGuru.id,
-            target: s.id,
-            relationship: targetGuru.isDiaspora ? "DIASPORA_MENTOR" : "TECHNICAL_ADVISOR",
-            weight: 0.85,
-            verified: true
-          });
-        }
-      }
-
-      // Connect Startups to Innovation Hubs (AUB, BDD, Berytech)
-      if (hubs.length > 0) {
-        const targetHub = hubs[idx % hubs.length];
-        const keyH = `${targetHub.id}->${s.id}`;
-        if (!addedLinkKeys.has(keyH)) {
-          addedLinkKeys.add(keyH);
-          rawLinks.push({
-            id: `link_hub_${s.id}_${targetHub.id}`,
-            source: targetHub.id,
-            target: s.id,
-            relationship: "INCUBATED_OR_ACCELERATED",
-            weight: 0.75,
-            verified: true
-          });
-        }
-      }
-    });
-
-    // Connect Diaspora Gurus to Silicon Valley / Regional Investors
-    gurus.forEach((g, idx) => {
-      if (investors.length > 0) {
-        const inv = investors[idx % investors.length];
-        const keyGI = `${g.id}->${inv.id}`;
-        if (!addedLinkKeys.has(keyGI)) {
-          addedLinkKeys.add(keyGI);
-          rawLinks.push({
-            id: `link_gi_${g.id}_${inv.id}`,
-            source: g.id,
-            target: inv.id,
-            relationship: "SCOUT_AND_DILIGENCE",
-            weight: 0.65,
-            verified: true
-          });
-        }
-      }
-    });
-
-    const statsObj = {
-      startupsCount: startups.length,
-      investorsCount: investors.length,
-      gurusCount: gurus.length,
-      diasporaCount: d3NodesList.filter(n => n.isDiaspora).length,
-      totalLinks: rawLinks.length
-    };
-
-    return { d3Nodes: d3NodesList, d3Links: rawLinks, stats: statsObj };
-  }, [nodes, edges, activeCategory, selectedCluster, searchQuery]);
-
-  // D3 Network Simulation Effect
-  useEffect(() => {
-    if (!svgRef.current || d3Nodes.length === 0) return;
-
-    const svg = d3.select(svgRef.current);
-    svg.selectAll("*").remove(); // Clean slate
-
-    const width = dimensions.width;
-    const height = dimensions.height;
-
-    // Build SVG Definitions (Arrow markers, Gradients, Glow filters)
-    const defs = svg.append("defs");
-
-    // Glow filter
-    const filter = defs.append("filter")
-      .attr("id", "techmap-glow")
-      .attr("x", "-20%")
-      .attr("y", "-20%")
-      .attr("width", "140%")
-      .attr("height", "140%");
-    filter.append("feGaussianBlur").attr("stdDeviation", "3").attr("result", "coloredBlur");
-    const feMerge = filter.append("feMerge");
-    feMerge.append("feMergeNode").attr("in", "coloredBlur");
-    feMerge.append("feMergeNode").attr("in", "SourceGraphic");
-
-    // Arrow markers for relationship directions
-    const markerTypes = [
-      { id: "arrow-startup", color: "#2E5A2C" },
-      { id: "arrow-investor", color: "#1E3A8A" },
-      { id: "arrow-guru", color: "#9333EA" },
-      { id: "arrow-hub", color: "#D97706" },
-      { id: "arrow-default", color: "#94A3B8" }
-    ];
-
-    markerTypes.forEach(m => {
-      defs.append("marker")
-        .attr("id", m.id)
-        .attr("viewBox", "0 -5 10 10")
-        .attr("refX", 26)
-        .attr("refY", 0)
-        .attr("markerWidth", 6)
-        .attr("markerHeight", 6)
-        .attr("orient", "auto")
-        .append("path")
-        .attr("d", "M0,-4L8,0L0,4")
-        .attr("fill", m.color);
-    });
-
-    // Outer Container for Zoom/Pan
-    const g = svg.append("g").attr("class", "zoom-container");
-
-    // Set up D3 Zoom
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.4, 3.5])
-      .on("zoom", (event) => {
-        g.attr("transform", event.transform);
-      });
-
-    svg.call(zoom);
-    zoomBehaviorRef.current = zoom;
-
-    // Simulation Setup
-    // Deep clone data to avoid simulation mutation bugs across React renders
-    const simNodes: D3Node[] = d3Nodes.map(d => ({ ...d }));
-    const simNodeMap = new Map(simNodes.map(d => [d.id, d]));
-    
-    const simLinks: D3Link[] = d3Links
-      .map(l => {
-        const srcId = typeof l.source === "string" ? l.source : (l.source as any).id;
-        const tgtId = typeof l.target === "string" ? l.target : (l.target as any).id;
-        if (simNodeMap.has(srcId) && simNodeMap.has(tgtId)) {
-          return {
-            ...l,
-            source: simNodeMap.get(srcId)!,
-            target: simNodeMap.get(tgtId)!
+  const handleDownloadPdf = () => {
+    try {
+      showToast("Generating PDF...");
+      setTimeout(() => {
+        try {
+          const dossier = {
+            id: activeReport.id,
+            slug: activeReport.key,
+            title: activeReport.title,
+            subtitle: activeReport.subtitle,
+            category: activeReport.category as any,
+            secondaryCategories: [],
+            date: activeReport.date,
+            readTime: "10 min read",
+            publisher: activeReport.publisher,
+            badge: activeReport.badge,
+            tagline: activeReport.tag,
+            excerpt: activeReport.excerpt,
+            keyMetrics: [
+              { label: "Category", value: activeReport.category, description: activeReport.tag, tone: "emerald" as const },
+              { label: "Date", value: activeReport.date, description: "Official 961AI Release", tone: "blue" as const }
+            ],
+            bulletHighlights: activeReport.bullets,
+            tags: [activeReport.category, activeReport.tag, "2026 Edition"]
           };
+          generateReportPdf(dossier);
+          showToast(`PDF downloaded: ${activeReport.key}_report_2026.pdf`);
+        } catch (e) {
+          console.error("PDF generation failed:", e);
+          showToast("Failed to generate PDF");
         }
-        return null;
-      })
-      .filter((l): l is D3Link => l !== null);
-
-    // Color mapper
-    const getNodeColor = (d: D3Node) => {
-      switch (d.category) {
-        case "startup": return { bg: "#EBF3EA", border: "#4D7D4B", fill: "#2E5A2C", text: "#1E3D1C" };
-        case "investor": return { bg: "#EFF6FF", border: "#3B82F6", fill: "#1E3A8A", text: "#172554" };
-        case "guru": return { bg: "#FAF5FF", border: "#A855F7", fill: "#7E22CE", text: "#581C87" };
-        case "hub": return { bg: "#FEF3C7", border: "#F59E0B", fill: "#B45309", text: "#78350F" };
-        default: return { bg: "#F1F5F9", border: "#64748B", fill: "#334155", text: "#0F172A" };
-      }
-    };
-
-    const getLinkColor = (l: D3Link) => {
-      const rel = l.relationship;
-      if (rel.includes("CAPITAL") || rel.includes("SYNDICATE")) return "#3B82F6";
-      if (rel.includes("DIASPORA") || rel.includes("MENTOR")) return "#A855F7";
-      if (rel.includes("INCUBATED") || rel.includes("ACCELERATED")) return "#F59E0B";
-      return "#94A3B8";
-    };
-
-    // Force Simulation definition
-    const simulation = d3.forceSimulation<D3Node>(simNodes)
-      .force("link", d3.forceLink<D3Node, D3Link>(simLinks).id((d) => d.id).distance(110).strength(0.6))
-      .force("charge", d3.forceManyBody().strength(-340).distanceMax(450))
-      .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide<D3Node>().radius((d) => d.radius + 18).iterations(2))
-      .force("x", d3.forceX(width / 2).strength(0.06))
-      .force("y", d3.forceY(height / 2).strength(0.06));
-
-    // Draw Links Container
-    const linkGroup = g.append("g").attr("class", "links-layer");
-
-    const link = linkGroup
-      .selectAll<SVGLineElement, D3Link>("line")
-      .data(simLinks)
-      .enter()
-      .append("line")
-      .attr("stroke", (d) => getLinkColor(d))
-      .attr("stroke-width", (d) => Math.max(1.2, d.weight * 2.2))
-      .attr("stroke-opacity", 0.6)
-      .attr("stroke-dasharray", (d) => d.relationship.includes("DIASPORA") ? "4,3" : "none")
-      .attr("cursor", "pointer")
-      .on("mouseenter", (_, d) => {
-        setHoveredLink(d);
-      })
-      .on("mouseleave", () => {
-        setHoveredLink(null);
-      });
-
-    // Draw Nodes Container
-    const nodeGroup = g.append("g").attr("class", "nodes-layer");
-
-    const node = nodeGroup
-      .selectAll<SVGGElement, D3Node>("g")
-      .data(simNodes)
-      .enter()
-      .append("g")
-      .attr("class", "node-element")
-      .attr("cursor", "pointer")
-      .call(
-        d3.drag<SVGGElement, D3Node>()
-          .on("start", (event, d) => {
-            if (!event.active) simulation.alphaTarget(0.3).restart();
-            d.fx = d.x;
-            d.fy = d.y;
-          })
-          .on("drag", (event, d) => {
-            d.fx = event.x;
-            d.fy = event.y;
-          })
-          .on("end", (event, d) => {
-            if (!event.active) simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
-          })
-      );
-
-    // Diaspora Pulse Ring
-    node.filter(d => !!d.isDiaspora)
-      .append("circle")
-      .attr("r", (d) => d.radius + 6)
-      .attr("fill", "none")
-      .attr("stroke", "#A855F7")
-      .attr("stroke-width", 1.5)
-      .attr("stroke-dasharray", "3,3")
-      .attr("opacity", 0.7);
-
-    // Node Main Circle
-    node.append("circle")
-      .attr("r", (d) => d.radius)
-      .attr("fill", (d) => getNodeColor(d).bg)
-      .attr("stroke", (d) => getNodeColor(d).border)
-      .attr("stroke-width", (d) => (d.category === "investor" || d.category === "hub" ? 3 : 2))
-      .attr("class", "transition-transform duration-200")
-      .style("box-shadow", "0 2px 8px rgba(0,0,0,0.1)");
-
-    // Inner Icon Glyph / Category Badge
-    node.append("text")
-      .attr("text-anchor", "middle")
-      .attr("dy", "-2px")
-      .attr("font-size", (d) => (d.radius >= 26 ? "14px" : "12px"))
-      .attr("user-select", "none")
-      .text((d) => {
-        if (d.category === "startup") return "🚀";
-        if (d.category === "investor") return "💼";
-        if (d.category === "guru") return "🧠";
-        return "🏛️";
-      });
-
-    // Country Flag / Diaspora Badge
-    node.append("text")
-      .attr("text-anchor", "middle")
-      .attr("dy", "12px")
-      .attr("font-size", "10px")
-      .attr("font-weight", "bold")
-      .attr("fill", (d) => getNodeColor(d).text)
-      .text((d) => {
-        if (d.isDiaspora) return "✈️";
-        return "🇱🇧";
-      });
-
-    // Node Label
-    node.append("text")
-      .attr("text-anchor", "middle")
-      .attr("dy", (d) => d.radius + 14)
-      .attr("font-family", "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace")
-      .attr("font-size", "11px")
-      .attr("font-weight", "bold")
-      .attr("fill", "#0F172A")
-      .text((d) => (d.label.length > 16 ? d.label.slice(0, 14) + "…" : d.label));
-
-    // Node Sub-label (Location / Ticket)
-    node.append("text")
-      .attr("text-anchor", "middle")
-      .attr("dy", (d) => d.radius + 25)
-      .attr("font-size", "9px")
-      .attr("font-weight", "500")
-      .attr("fill", "#64748B")
-      .text((d) => {
-        if (d.category === "startup") return d.stage || "Onshore";
-        if (d.category === "investor") return d.ticketSize ? d.ticketSize.split("-")[0] : "VC";
-        if (d.category === "guru") return d.isDiaspora ? "Diaspora" : "Beirut";
-        return "Hub";
-      });
-
-    // Node Interaction Handlers
-    node
-      .on("mouseenter", function(_, d) {
-        setHoveredNode(d);
-        d3.select(this).select("circle")
-          .transition().duration(150)
-          .attr("r", d.radius + 5)
-          .attr("stroke-width", 4);
-
-        if (highlightConnected) {
-          // Highlight connected links
-          link
-            .attr("stroke-opacity", (l) => {
-              const srcId = typeof l.source === "object" ? l.source.id : l.source;
-              const tgtId = typeof l.target === "object" ? l.target.id : l.target;
-              return srcId === d.id || tgtId === d.id ? 1 : 0.15;
-            })
-            .attr("stroke-width", (l) => {
-              const srcId = typeof l.source === "object" ? l.source.id : l.source;
-              const tgtId = typeof l.target === "object" ? l.target.id : l.target;
-              return srcId === d.id || tgtId === d.id ? 3 : 1;
-            });
-        }
-      })
-      .on("mouseleave", function(_, d) {
-        setHoveredNode(null);
-        d3.select(this).select("circle")
-          .transition().duration(150)
-          .attr("r", d.radius)
-          .attr("stroke-width", (d.category === "investor" || d.category === "hub" ? 3 : 2));
-
-        link
-          .attr("stroke-opacity", 0.6)
-          .attr("stroke-width", (l) => Math.max(1.2, l.weight * 2.2));
-      })
-      .on("click", (_, d) => {
-        setSelectedNode(d.originalNode);
-        onSelectNode(d.originalNode);
-      });
-
-    // Simulation Tick
-    simulation.on("tick", () => {
-      link
-        .attr("x1", (d) => (d.source as D3Node).x || 0)
-        .attr("y1", (d) => (d.source as D3Node).y || 0)
-        .attr("x2", (d) => (d.target as D3Node).x || 0)
-        .attr("y2", (d) => (d.target as D3Node).y || 0);
-
-      node.attr("transform", (d) => `translate(${d.x || 0},${d.y || 0})`);
-    });
-
-    return () => {
-      simulation.stop();
-    };
-  }, [d3Nodes, d3Links, dimensions, highlightConnected, onSelectNode]);
-
-  // Zoom controls
-  const handleZoomIn = () => {
-    if (!svgRef.current || !zoomBehaviorRef.current) return;
-    d3.select(svgRef.current).transition().duration(300).call(zoomBehaviorRef.current.scaleBy, 1.3);
+      }, 100);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleZoomOut = () => {
-    if (!svgRef.current || !zoomBehaviorRef.current) return;
-    d3.select(svgRef.current).transition().duration(300).call(zoomBehaviorRef.current.scaleBy, 0.7);
+  const handlePrint = () => {
+    window.print();
   };
 
-  const handleResetZoom = () => {
-    if (!svgRef.current || !zoomBehaviorRef.current) return;
-    d3.select(svgRef.current).transition().duration(350).call(zoomBehaviorRef.current.transform, d3.zoomIdentity);
+  const handleReadMore = () => {
+    if (onNavigateToInvestmentReports) {
+      onNavigateToInvestmentReports(activeReport.id);
+    } else if (onNavigateToResources) {
+      onNavigateToResources();
+    }
+  };
+
+  const handleSubscribeNewsletter = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newsletterEmail.trim() || !newsletterEmail.includes("@")) {
+      showToast("Please enter a valid email address");
+      return;
+    }
+    setNewsletterSubscribed(true);
+    showToast("Subscribed! You will receive monthly PE & VC dispatches.");
+    setNewsletterEmail("");
+    setTimeout(() => setNewsletterSubscribed(false), 5000);
+  };
+
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % reports.length);
+  };
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + reports.length) % reports.length);
   };
 
   return (
-    <div id="lebanon-ai-tech-map" className="w-full rounded-2xl bg-white border-2 border-[#B0CFAD] p-5 sm:p-6 space-y-5 shadow-xs font-mono">
-      {/* Top Header & Overview */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#D7E7D6] pb-4">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#EBF3EA] text-[#2E5A2C] border-2 border-[#75AC73] flex items-center gap-1.5 shadow-2xs">
-              <Network className="w-3.5 h-3.5 text-[#4D7D4B] animate-pulse" />
-              <span>D3 INTERACTIVE ECOSYSTEM GRAPH</span>
-            </span>
-            <span className="px-2.5 py-0.5 rounded-md text-xs font-bold bg-[#F6FAF5] text-slate-800 border border-[#D7E7D6]">
-              Lebanon Onshore ↔ Diaspora Bridge ↔ Regional VCs
-            </span>
-          </div>
-
-          <h2 className="text-xl sm:text-2xl font-black text-[#000000] tracking-tight flex items-center gap-2">
-            <span>Lebanon AI Tech Map</span>
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-700 font-medium max-w-3xl">
-            Live interactive network graphing the capital, advisory, and technical synergy bridges linking Lebanese AI startups, regional institutional funds, and diaspora mentors worldwide.
-          </p>
+    <section 
+      id="investment-report-section" 
+      className="rounded-2xl bg-white border-2 border-[#B0CFAD] p-5 sm:p-6 shadow-xs font-mono text-[#000000] relative overflow-hidden transition-all space-y-4"
+    >
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className="absolute top-3 right-3 z-20 px-3 py-1 rounded-lg bg-black text-white text-xs font-bold shadow-lg animate-in fade-in">
+          {toastMessage}
         </div>
+      )}
 
-        {/* Quick Nav Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto shrink-0">
-          {onNavigateToMatchmaking && (
-            <button
-              onClick={onNavigateToMatchmaking}
-              className="px-3 py-1.5 rounded-xl bg-[#4D7D4B] hover:bg-[#3D633C] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>AI Matchmaker</span>
-            </button>
-          )}
-
-          {onNavigateToGraphArch && (
-            <button
-              onClick={onNavigateToGraphArch}
-              className="px-3 py-1.5 rounded-xl bg-white hover:bg-[#EBF3EA] text-[#2E5A2C] border border-[#B0CFAD] text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95"
-            >
-              <Layers className="w-3.5 h-3.5 text-[#4D7D4B]" />
-              <span>Neo4j Cypher Console</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Filter and Control Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 bg-[#F6FAF5] rounded-xl border border-[#D7E7D6] text-xs">
-        {/* Category Pills */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-bold text-slate-700 mr-1 flex items-center gap-1">
-            <Filter className="w-3.5 h-3.5 text-[#4D7D4B]" />
-            <span>Entities:</span>
+      {/* Top Header: Badge & Report Switcher Tabs */}
+      <div className="flex flex-col items-start justify-start gap-2.5 text-left">
+        <div className="flex flex-wrap items-center justify-start gap-2">
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#EBF3EA] text-[#2E5A2C] border border-[#75AC73] flex items-center gap-1 shadow-2xs">
+            <Sparkles className="w-3 h-3 text-[#2E5A2C]" />
+            <span>INVESTMENT REPORTS & RESEARCH</span>
           </span>
 
-          {[
-            { id: "ALL", label: "All Network", icon: "🌐", count: d3Nodes.length },
-            { id: "STARTUPS", label: "🚀 Startups", count: stats.startupsCount },
-            { id: "INVESTORS", label: "💼 Regional VCs", count: stats.investorsCount },
-            { id: "GURUS", label: "🧠 Gurus & Scientists", count: stats.gurusCount },
-            { id: "DIASPORA", label: "✈️ Diaspora Bridge", count: stats.diasporaCount }
-          ].map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id as any)}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
-                activeCategory === cat.id
-                  ? "bg-[#2E5A2C] text-white shadow-2xs"
-                  : "bg-white hover:bg-[#EBF3EA] text-slate-800 border border-[#D7E7D6]"
-              }`}
-            >
-              <span>{cat.label}</span>
-              <span className="text-[10px] opacity-75">({cat.count})</span>
-            </button>
-          ))}
+          <span className="text-[10px] font-bold text-[#2E5A2C] bg-[#F6FAF5] px-2 py-0.5 rounded-md border border-[#D7E7D6]">
+            {activeReport.badge}
+          </span>
+
+          <span className="text-[10px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-[#B0CFAD]">
+            Category: {activeReport.category}
+          </span>
         </div>
 
-        {/* Search & Cluster Filter */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+        {/* Switcher Pills Left-Aligned */}
+        <div className="flex flex-wrap items-center justify-start gap-1.5 bg-[#F6FAF5] p-1 rounded-xl border border-[#D7E7D6]">
+          {reports.map((rep, idx) => {
+            const isMena = rep.key === "mena_lebanon_vc";
+            const isActive = currentSlide === idx;
+            return (
+              <button
+                key={rep.id}
+                onClick={() => setCurrentSlide(idx)}
+                style={isActive || isMena ? { color: "#ffffff" } : undefined}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  isActive
+                    ? "bg-[#2E5A2C] text-white !text-white shadow-2xs"
+                    : isMena
+                    ? "bg-[#2E5A2C] text-white !text-white shadow-2xs hover:bg-[#3D633C]"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${isActive || isMena ? "bg-white" : "bg-slate-300"}`} />
+                <span style={isActive || isMena ? { color: "#ffffff" } : undefined} className={isActive || isMena ? "text-white !text-white font-bold" : ""}>
+                  {rep.key === "mena_lebanon_vc" ? "MENA & Lebanon VC Overview" :
+                   rep.key === "pe_vc" ? "PE & VC Landscape" :
+                   rep.key === "war_economics" ? "Wartime Economics" :
+                   rep.key === "vcfo_playbook" ? "VCFO & Burn Rate" : "Offshore SAL & Tax"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Left-Aligned Headline & Sub-headline / Excerpt */}
+      <div className="text-left w-full space-y-2">
+        <h2 
+          onClick={handleReadMore}
+          className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight hover:text-[#2E5A2C] transition-colors cursor-pointer leading-tight text-left"
+        >
+          {activeReport.title}
+        </h2>
+
+        {activeReport.subtitle && (
+          <p className="text-xs sm:text-sm font-semibold text-[#2E5A2C] text-left">
+            {activeReport.subtitle}
+          </p>
+        )}
+
+        <p className="text-xs sm:text-sm text-slate-600 font-sans leading-relaxed text-left">
+          {activeReport.excerpt}
+        </p>
+      </div>
+
+      {/* Newsletter Subscription Form with WhatsApp Broadcast Button Alongside */}
+      <div className="bg-[#F6FAF5] border border-[#D7E7D6] rounded-xl p-3 sm:p-3.5 flex flex-col md:flex-row items-center justify-between gap-3">
+        {/* Left text label */}
+        <div className="flex items-center gap-2.5 text-slate-800 text-xs font-semibold shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-[#EBF3EA] border border-[#B0CFAD] flex items-center justify-center text-[#2E5A2C] shrink-0">
+            <Mail className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="font-bold text-slate-900 leading-tight">Get Investment Intelligence Dispatches</div>
+            <div className="text-[11px] text-slate-500 font-normal font-sans">Monthly dealflow, fund teardowns & valuation memos</div>
+          </div>
+        </div>
+
+        {/* Subscription Form + WhatsApp Broadcast Button */}
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full md:w-auto">
+          {/* Email input form */}
+          <form onSubmit={handleSubscribeNewsletter} className="flex items-center gap-1.5 w-full sm:w-auto">
             <input
-              type="text"
-              placeholder="Search tech, node, city..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-white border border-[#D7E7D6] rounded-lg pl-8 pr-3 py-1 text-xs text-slate-800 placeholder-slate-400 font-medium focus:outline-none focus:border-[#4D7D4B] w-48"
+              type="email"
+              placeholder="Enter your email..."
+              value={newsletterEmail}
+              onChange={(e) => setNewsletterEmail(e.target.value)}
+              className="px-3 py-1.5 rounded-lg border border-[#B0CFAD] bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-[#2E5A2C] w-full sm:w-56"
             />
-          </div>
+            <button
+              type="submit"
+              className="px-3 py-1.5 rounded-lg bg-[#2E5A2C] hover:bg-[#1E3B1D] text-white text-xs font-bold shadow-2xs transition-all active:scale-95 shrink-0 flex items-center gap-1 cursor-pointer"
+            >
+              {newsletterSubscribed ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Joined</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-3 h-3" />
+                  <span>Subscribe</span>
+                </>
+              )}
+            </button>
+          </form>
 
-          <select
-            value={selectedCluster}
-            onChange={(e) => setSelectedCluster(e.target.value)}
-            className="bg-white border border-[#D7E7D6] rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#4D7D4B]"
+          {/* WhatsApp Sharing Button Alongside Form */}
+          <button
+            onClick={handleShareWhatsApp}
+            className="px-3 py-1.5 rounded-lg bg-[#25D366] hover:bg-[#1EBE5D] text-white shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 text-xs font-bold shrink-0 w-full sm:w-auto"
+            title="Broadcast report excerpt via WhatsApp to your professional network"
           >
-            <option value="ALL">All Hubs (Global)</option>
-            <option value="beirut">🇱🇧 Beirut & BDD Hub</option>
-            <option value="bay_area">🇺🇸 Silicon Valley / Bay Area</option>
-            <option value="gcc">🇦🇪 🇸🇦 GCC (Dubai / Riyadh)</option>
-            <option value="europe">🇪🇺 Paris & London Bridge</option>
-          </select>
+            <MessageCircle className="w-3.5 h-3.5 fill-white" />
+            <span>WhatsApp Broadcast</span>
+          </button>
         </div>
       </div>
 
-      {/* Main Interactive Stage Container */}
-      <div ref={containerRef} className="relative w-full rounded-2xl bg-[#FCFDFC] border-2 border-[#D7E7D6] overflow-hidden">
-        {/* Floating Zoom & Legend Controls */}
-        <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-          <div className="bg-white/95 backdrop-blur-xs p-1.5 rounded-xl border border-[#D7E7D6] shadow-md flex flex-col gap-1">
-            <button
-              onClick={handleZoomIn}
-              className="p-1.5 rounded-lg hover:bg-[#EBF3EA] text-slate-700 hover:text-[#2E5A2C] transition-colors"
-              title="Zoom In"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleZoomOut}
-              className="p-1.5 rounded-lg hover:bg-[#EBF3EA] text-slate-700 hover:text-[#2E5A2C] transition-colors"
-              title="Zoom Out"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleResetZoom}
-              className="p-1.5 rounded-lg hover:bg-[#EBF3EA] text-slate-700 hover:text-[#2E5A2C] transition-colors"
-              title="Reset View"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Network Metrics Overlay Box */}
-        <div className="absolute top-4 right-4 z-10 hidden sm:flex items-center gap-3 bg-white/95 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-[#D7E7D6] shadow-md text-xs font-mono">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#4D7D4B]"></span>
-            <span className="text-slate-600 font-medium">Nodes:</span>
-            <strong className="text-slate-900">{d3Nodes.length}</strong>
-          </div>
-          <div className="h-3 w-px bg-slate-300"></div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#3B82F6]"></span>
-            <span className="text-slate-600 font-medium">Bridges:</span>
-            <strong className="text-slate-900">{d3Links.length}</strong>
-          </div>
-          <div className="h-3 w-px bg-slate-300"></div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#A855F7]"></span>
-            <span className="text-slate-600 font-medium">Diaspora:</span>
-            <strong className="text-slate-900">{stats.diasporaCount}</strong>
-          </div>
-        </div>
-
-        {/* Hovered Node Tooltip Card */}
-        {hoveredNode && (
-          <div 
-            className="absolute bottom-4 left-4 z-10 max-w-sm bg-white/95 backdrop-blur-md p-4 rounded-xl border-2 border-[#75AC73] shadow-lg text-xs space-y-2 animate-in fade-in duration-150"
+      {/* Action Buttons as Bottom of Section */}
+      <div className="border-t border-[#D7E7D6] pt-3.5 flex flex-wrap items-center justify-between gap-3">
+        {/* Left Side: Slide Navigator */}
+        <div className="flex items-center gap-1 bg-[#F6FAF5] rounded-xl border border-[#D7E7D6] p-1">
+          <button
+            onClick={prevSlide}
+            className="p-1.5 rounded-lg hover:bg-white text-slate-600 hover:text-[#2E5A2C] transition-colors cursor-pointer"
+            title="Previous Report"
           >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#EBF3EA] text-[#2E5A2C] border border-[#B0CFAD]">
-                    {hoveredNode.category.toUpperCase()}
-                  </span>
-                  {hoveredNode.isDiaspora && (
-                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200">
-                      ✈️ Diaspora Hub
-                    </span>
-                  )}
-                </div>
-                <h4 className="text-sm font-black text-slate-900 mt-1">{hoveredNode.label}</h4>
-              </div>
-              <span className="text-base">{hoveredNode.isDiaspora ? "🌐" : "🇱🇧"}</span>
-            </div>
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-xs font-bold px-2 text-slate-600 font-mono">
+            {currentSlide + 1} / {reports.length}
+          </span>
+          <button
+            onClick={nextSlide}
+            className="p-1.5 rounded-lg hover:bg-white text-slate-600 hover:text-[#2E5A2C] transition-colors cursor-pointer"
+            title="Next Report"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
 
-            <p className="text-[11px] text-slate-700 font-sans line-clamp-2 leading-relaxed">
-              {hoveredNode.title || hoveredNode.bio || "Active participant in the Lebanese AI ecosystem."}
-            </p>
+        {/* Right Side: Secondary Actions & Main Read More Button */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleDownloadPdf}
+            className="p-2 rounded-xl bg-white hover:bg-[#F6FAF5] text-[#2E5A2C] border border-[#B0CFAD] shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center gap-1 text-xs font-bold"
+            title="Download formatted PDF of this report"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Download PDF</span>
+          </button>
 
-            <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
-              <span>📍 {hoveredNode.location || "Lebanon"}</span>
-              <span className="font-bold text-[#2E5A2C]">Click node to inspect ↗</span>
-            </div>
-          </div>
-        )}
+          <button
+            onClick={handlePrint}
+            className="p-2 rounded-xl bg-white hover:bg-[#F6FAF5] text-slate-700 border border-slate-300 shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center gap-1 text-xs font-bold"
+            title="Print / Save PDF"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Print</span>
+          </button>
 
-        {/* Hovered Link Tooltip Card */}
-        {hoveredLink && !hoveredNode && (
-          <div className="absolute bottom-4 left-4 z-10 bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-mono shadow-md flex items-center gap-2">
-            <span className="text-[#75AC73] font-bold">RELATIONSHIP:</span>
-            <span>{hoveredLink.relationship.replace(/_/g, " ")}</span>
-            <span className="text-[10px] opacity-75">({Math.round(hoveredLink.weight * 100)}% strength)</span>
-          </div>
-        )}
+          <button
+            onClick={handleCopyLink}
+            className="p-2 rounded-xl bg-white hover:bg-[#F6FAF5] text-slate-700 border border-slate-300 shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center gap-1 text-xs font-bold"
+            title="Copy Report Link"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">Copy Link</span>
+          </button>
 
-        {/* D3 SVG Canvas */}
-        <svg
-          ref={svgRef}
-          width={dimensions.width}
-          height={dimensions.height}
-          className="w-full h-auto block select-none"
-        />
-
-        {/* Visual Map Legend Footer */}
-        <div className="border-t border-[#D7E7D6] bg-white p-3 flex flex-wrap items-center justify-between gap-3 text-[11px]">
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="font-bold text-slate-700">Map Legend:</span>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-[#EBF3EA] border border-[#4D7D4B]"></span>
-              <span className="text-slate-800 font-medium">Startups & Scaleups</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-[#EFF6FF] border border-[#3B82F6]"></span>
-              <span className="text-slate-800 font-medium">Regional VCs & Angels</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-[#FAF5FF] border border-[#A855F7]"></span>
-              <span className="text-slate-800 font-medium">Diaspora Gurus & Scientists</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-[#FEF3C7] border border-[#F59E0B]"></span>
-              <span className="text-slate-800 font-medium">Accelerators & Universities</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-slate-500">
-            <span>💡 Drag nodes to isolate clusters • Scroll to zoom • Click to view dossier</span>
-          </div>
+          <button
+            onClick={handleReadMore}
+            style={{ color: "#ffffff" }}
+            className="px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 !text-white text-xs font-black shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+          >
+            <BookOpen className="w-3.5 h-3.5 !text-white text-white" style={{ color: "#ffffff" }} />
+            <span style={{ color: "#ffffff" }} className="!text-white font-black">Explore All Research Dossiers</span>
+            <ArrowRight className="w-3.5 h-3.5 !text-white text-white" style={{ color: "#ffffff" }} />
+          </button>
         </div>
       </div>
-
-      {/* Node Mini Highlights Grid (3 Columns) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
-        <div className="p-3.5 bg-[#F6FAF5] rounded-xl border border-[#D7E7D6] space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-[#2E5A2C]">
-            <span className="flex items-center gap-1">
-              <span>🚀</span>
-              <span>Top AI Scaleups</span>
-            </span>
-            <span>{stats.startupsCount} Entities</span>
-          </div>
-          <p className="text-[11px] text-slate-600 font-sans">
-            CedarsLLM, Phoenicia Vision, Beirut NeuroTech, MedLevant, and LevantVoice deploying Arabic frontier AI.
-          </p>
-        </div>
-
-        <div className="p-3.5 bg-[#EFF6FF]/60 rounded-xl border border-blue-200 space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-blue-900">
-            <span className="flex items-center gap-1">
-              <span>💼</span>
-              <span>Venture Capital Pipelines</span>
-            </span>
-            <span>{stats.investorsCount} Funds</span>
-          </div>
-          <p className="text-[11px] text-slate-600 font-sans">
-            Cedar AI Syndicate, LebNet SV Angels, MEVP ($300M AUM), Phoenician Fund, and IM Capital matching facilities.
-          </p>
-        </div>
-
-        <div className="p-3.5 bg-[#FAF5FF]/60 rounded-xl border border-purple-200 space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-purple-900">
-            <span className="flex items-center gap-1">
-              <span>✈️</span>
-              <span>Diaspora Mentorship Bridge</span>
-            </span>
-            <span>{stats.diasporaCount} Leaders</span>
-          </div>
-          <p className="text-[11px] text-slate-600 font-sans">
-            Senior scientists at Anthropic, Meta FAIR, Mistral AI, MIT Media Lab, and Stanford advising onshore founders.
-          </p>
-        </div>
-      </div>
-    </div>
+    </section>
   );
 };

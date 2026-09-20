@@ -1,474 +1,479 @@
-import React, { useState } from "react";
-import {
+import React, { useState, useEffect } from "react";
+import { 
+  Search, 
+  Command, 
+  ArrowRight, 
+  Building2, 
+  Newspaper, 
+  FileText, 
+  Briefcase, 
+  Calculator, 
+  ShieldCheck, 
+  ExternalLink, 
+  Sparkles,
   X,
-  Shield,
-  FileText,
-  Lock,
-  Cookie,
-  Download,
-  Trash2,
-  CheckCircle2,
-  ExternalLink,
   Scale,
-  Building2,
-  Mail,
-  AlertCircle,
-  Globe
+  Home,
+  Layers,
+  Gift,
+  Info,
+  Trophy,
+  Brain,
+  Landmark
 } from "lucide-react";
+import { GraphNode, StartupNewsArticle, KnowledgeResource } from "../types";
 
-interface LegalAndGdprModalProps {
+export interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: "gdpr" | "terms" | "privacy" | "cookies" | "dsar";
+  nodes: GraphNode[];
+  news: StartupNewsArticle[];
+  resources: KnowledgeResource[];
+  onSelectNode: (node: GraphNode) => void;
+  onNavigateToModule: (moduleId: number) => void;
+  onNavigateToAdmin?: () => void;
+  onOpenTaxCalculator: () => void;
+  onOpenLegalCodex: () => void;
 }
 
-export const LegalAndGdprModal: React.FC<LegalAndGdprModalProps> = ({
+export const CommandPalette: React.FC<CommandPaletteProps> = ({
   isOpen,
   onClose,
-  initialTab = "gdpr"
+  nodes,
+  news,
+  resources,
+  onSelectNode,
+  onNavigateToModule,
+  onNavigateToAdmin,
+  onOpenTaxCalculator,
+  onOpenLegalCodex
 }) => {
-  const [activeTab, setActiveTab] = useState<"gdpr" | "terms" | "privacy" | "cookies" | "dsar">(initialTab);
-  const [dsarEmail, setDsarEmail] = useState("");
-  const [dsarSubmitted, setDsarSubmitted] = useState<string | null>(null);
-  const [copiedPolicy, setCopiedPolicy] = useState(false);
+  const [query, setQuery] = useState("");
+
+  // Keyboard shortcut listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        if (isOpen) {
+          onClose();
+        } else {
+          // Open handled by parent or state
+        }
+      }
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const handleDownloadUserData = () => {
-    try {
-      const authUser = localStorage.getItem("961ai_auth_user");
-      const mailingList = localStorage.getItem("961ai_mailing_list");
-      const questionnaire = localStorage.getItem("961ai_user_questionnaire");
-      
-      const payload = {
-        platform: "961AI Network - Joint Initiative of Al Khawarizmi Solutions & NCEI Lebanon",
-        exportedAt: new Date().toISOString(),
-        gdprArticle: "Article 20 (Right to Data Portability)",
-        legalBasis: "User Consent & Legitimate Interest for DeepTech Matchmaking",
-        userData: {
-          session: authUser ? JSON.parse(authUser) : "No active user session stored",
-          mailingListRecord: mailingList ? JSON.parse(mailingList) : "Not found",
-          questionnaireDraft: questionnaire ? JSON.parse(questionnaire) : "None"
-        }
-      };
+  const q = query.trim().toLowerCase();
 
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `961ai_gdpr_data_export_${Date.now()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch {
-      alert("Failed to export data.");
-    }
-  };
+  // Search Results
+  const matchingNodes = q
+    ? nodes.filter(
+        (n) =>
+          n.label.toLowerCase().includes(q) ||
+          n.tags?.some((t) => t.toLowerCase().includes(q)) ||
+          n.location?.toLowerCase().includes(q) ||
+          n.bio?.toLowerCase().includes(q)
+      ).slice(0, 5)
+    : nodes.slice(0, 3);
 
-  const handleDsarRequest = (type: "erasure" | "rectification" | "unsubscribe") => {
-    if (!dsarEmail || !dsarEmail.includes("@")) {
-      alert("Please enter a valid email address for the Data Subject Access Request.");
-      return;
-    }
+  const matchingNews = q
+    ? news.filter(
+        (a) =>
+          a.title.toLowerCase().includes(q) ||
+          a.summary.toLowerCase().includes(q) ||
+          a.tags?.some((t) => t.toLowerCase().includes(q))
+      ).slice(0, 4)
+    : news.slice(0, 3);
 
-    if (type === "erasure") {
-      try {
-        // Clear local storage entries for this user
-        const rawMailing = localStorage.getItem("961ai_mailing_list");
-        if (rawMailing) {
-          const list = JSON.parse(rawMailing);
-          const filtered = list.filter((item: any) => item.email.toLowerCase() !== dsarEmail.toLowerCase());
-          localStorage.setItem("961ai_mailing_list", JSON.stringify(filtered));
-        }
-      } catch {
-        // ignore
+  const matchingResources = q
+    ? resources.filter(
+        (r) =>
+          r.title.toLowerCase().includes(q) ||
+          r.summary.toLowerCase().includes(q) ||
+          r.tags?.some((t) => t.toLowerCase().includes(q))
+      ).slice(0, 4)
+    : resources.slice(0, 3);
+
+  // Quick Action Shortcuts
+  const quickActions = [
+    {
+      id: "home_nav",
+      title: "Home: Community Portal & Ecosystem Wire",
+      category: "Navigation",
+      icon: <Home className="w-4 h-4 text-[#4D7D4B]" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(0);
       }
-      setDsarSubmitted(`GDPR Erasure Request logged for ${dsarEmail}. All identifiable local records and newsletter dispatches have been purged (Right to be Forgotten).`);
-    } else if (type === "unsubscribe") {
-      try {
-        const rawMailing = localStorage.getItem("961ai_mailing_list");
-        if (rawMailing) {
-          const list = JSON.parse(rawMailing);
-          const updated = list.map((item: any) => 
-            item.email.toLowerCase() === dsarEmail.toLowerCase() ? { ...item, status: "Unsubscribed" } : item
-          );
-          localStorage.setItem("961ai_mailing_list", JSON.stringify(updated));
-        }
-      } catch {
-        // ignore
+    },
+    {
+      id: "mita_initiatives_nav",
+      title: "MITA Initiatives: Building the Digital Republic & National AI Strategy (mitai.gov.lb)",
+      category: "Public Sector Initiatives",
+      icon: <Landmark className="w-4 h-4 text-emerald-600" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(20);
       }
-      setDsarSubmitted(`Successfully unsubscribed ${dsarEmail} from marketing communications.`);
-    } else {
-      setDsarSubmitted(`Rectification ticket logged for ${dsarEmail}. Our Data Protection Officer (DPO) will review within 72 business hours.`);
+    },
+    {
+      id: "omsar_projects_nav",
+      title: "OMSAR Projects: Reinventing Government 2030, BIND-Leb Behavioral Lab (omsar.gov.lb)",
+      category: "Public Sector Initiatives",
+      icon: <Building2 className="w-4 h-4 text-blue-600" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(21);
+      }
+    },
+    {
+      id: "second_brain_nav",
+      title: "Second Brain (NotebookLLM): Save & Arrange Docs, Multi-Doc AI Synthesis & Audio",
+      category: "Sovereign Cognitive Engine",
+      icon: <Brain className="w-4 h-4 text-emerald-500" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(17);
+      }
+    },
+    {
+      id: "pitch_room_nav",
+      title: "Pitch Room: Automated AI Due Diligence, Code Moat Audit & Diaspora SPVs",
+      category: "Venture Acceleration",
+      icon: <Sparkles className="w-4 h-4 text-amber-500" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(15);
+      }
+    },
+    {
+      id: "about_specs_nav",
+      title: "About Us: Sovereign Mission, Technical Specs & Services Matrix",
+      category: "Platform & Specifications",
+      icon: <Info className="w-4 h-4 text-emerald-600" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(13);
+      }
+    },
+    {
+      id: "quests_rewards_nav",
+      title: "Community Quests & Rewards: Gamified Bounties, Cedar XP & Service Subsidies",
+      category: "Community & Gamification",
+      icon: <Trophy className="w-4 h-4 text-amber-500" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(14);
+      }
+    },
+    {
+      id: "directory_nav",
+      title: "Yellow Pages Directory: Verified Startups & Agencies",
+      category: "Directory",
+      icon: <Layers className="w-4 h-4 text-[#2E5A2C]" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(1);
+      }
+    },
+    {
+      id: "pricing_nav",
+      title: "Pricing & Plans: 6-Hour Demo vs Annual Pro ($100/yr)",
+      category: "Membership & Upgrades",
+      icon: <Sparkles className="w-4 h-4 text-amber-600" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(12);
+      }
+    },
+    {
+      id: "referrals_nav",
+      title: "Founder Referrals: Earn 1 Month Free for Every Startup Invited",
+      category: "Growth & Rewards",
+      icon: <Gift className="w-4 h-4 text-emerald-600" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(2);
+      }
+    },
+    {
+      id: "tax_calc",
+      title: "0% Offshore S.A.L. & Runway Engine",
+      category: "Tools & Financials",
+      icon: <Calculator className="w-4 h-4 text-[#4D7D4B]" />,
+      action: () => {
+        onClose();
+        onOpenTaxCalculator();
+      }
+    },
+    {
+      id: "legal_sandbox",
+      title: "Lebanon Sandbox & Law 81 AI Legal Codex",
+      category: "Regulatory & Compliance",
+      icon: <Scale className="w-4 h-4 text-[#2E5A2C]" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(10);
+      }
+    },
+    {
+      id: "research_papers_nav",
+      title: "Research Papers & PDF Intelligence: Institutional Publications & Downloads",
+      category: "Intelligence Wire",
+      icon: <FileText className="w-4 h-4 text-[#2E5A2C]" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(24);
+      }
+    },
+    {
+      id: "newsroom",
+      title: "961AINews Dispatch & Venture Rounds",
+      category: "Intelligence Wire",
+      icon: <Newspaper className="w-4 h-4 text-rose-600" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(8);
+      }
+    },
+    {
+      id: "marketplace",
+      title: "Verified Lebanese Software & AI Agencies",
+      category: "Procurement",
+      icon: <Briefcase className="w-4 h-4 text-indigo-600" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(9);
+      }
+    },
+    {
+      id: "admin_control",
+      title: "Admin Root Console: Password Protected (/admin)",
+      category: "Root Operations",
+      icon: <ShieldCheck className="w-4 h-4 text-rose-600" />,
+      action: () => {
+        onClose();
+        if (onNavigateToAdmin) {
+          onNavigateToAdmin();
+        } else {
+          onNavigateToModule(4);
+        }
+      }
+    },
+    {
+      id: "questionnaire",
+      title: "Intake Questionnaire & AI Matchmaking",
+      category: "Workspace",
+      icon: <Sparkles className="w-4 h-4 text-amber-600" />,
+      action: () => {
+        onClose();
+        onNavigateToModule(2);
+      }
     }
-  };
+  ].filter((a) => !q || a.title.toLowerCase().includes(q) || a.category.toLowerCase().includes(q));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl max-h-[90vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
-        
-        {/* Modal Top Header */}
-        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-950 text-white shrink-0">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-mono text-[10px] font-bold tracking-wide uppercase">
-                  Joint Enterprise Platform
-                </span>
-                <span className="text-slate-400 text-xs font-mono">
-                  Law 126/2019 & EU GDPR Compliant
-                </span>
-              </div>
-              <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                <Scale className="w-5 h-5 text-emerald-400" />
-                <span>Legal Codex, Privacy Policy & GDPR Sovereignty</span>
-              </h2>
-              <p className="text-xs text-slate-300 mt-1 max-w-2xl">
-                Official regulatory and governance documentation for the <strong>961AI Network</strong>, jointly operated by <strong>Al Khawarizmi Solutions</strong> and <strong>NCEI Lebanon (The National Council for Entrepreneurship and Innovation)</strong>.
-              </p>
-            </div>
-
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-4 sm:pt-20 overflow-y-auto animate-in fade-in duration-100">
+      <div className="bg-white rounded-2xl border-2 border-[#B0CFAD] max-w-2xl w-full shadow-2xl overflow-hidden font-mono flex flex-col">
+        {/* Search Header Bar */}
+        <div className="p-4 border-b border-[#D7E7D6] bg-[#FAFCFA] flex items-center gap-3">
+          <Search className="w-5 h-5 text-[#4D7D4B] shrink-0" />
+          <input
+            type="text"
+            placeholder="Type to search entities, SAFEs, tax codex, news, or press 'ESC' to close..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+            className="w-full bg-transparent text-sm text-[#000000] placeholder-slate-400 focus:outline-hidden font-medium"
+          />
+          {query && (
             <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700 transition-colors"
+              onClick={() => setQuery("")}
+              className="p-1 hover:bg-slate-200 rounded text-slate-500"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
-          </div>
-
-          {/* Navigation Tabs */}
-          <div className="flex items-center gap-2 mt-5 overflow-x-auto pb-1 text-xs scrollbar-none font-mono">
-            <button
-              onClick={() => setActiveTab("gdpr")}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                activeTab === "gdpr"
-                  ? "bg-emerald-500 text-slate-950 font-bold"
-                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>GDPR Compliance</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("privacy")}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                activeTab === "privacy"
-                  ? "bg-emerald-500 text-slate-950 font-bold"
-                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
-              }`}
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span>Privacy Policy</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("terms")}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                activeTab === "terms"
-                  ? "bg-emerald-500 text-slate-950 font-bold"
-                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Terms of Service</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("cookies")}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                activeTab === "cookies"
-                  ? "bg-emerald-500 text-slate-950 font-bold"
-                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
-              }`}
-            >
-              <Cookie className="w-3.5 h-3.5" />
-              <span>Cookie Policy</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("dsar")}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                activeTab === "dsar"
-                  ? "bg-emerald-500 text-slate-950 font-bold"
-                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
-              }`}
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>GDPR Self-Service & DSAR</span>
-            </button>
-          </div>
+          )}
+          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-300 rounded">
+            ESC
+          </kbd>
         </div>
 
-        {/* Modal Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-6 text-slate-700 space-y-6 text-sm leading-relaxed">
-          
-          {/* TAB 1: GDPR COMPLIANCE */}
-          {activeTab === "gdpr" && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3 text-emerald-900">
-                <Shield className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                <div className="text-xs space-y-1">
-                  <h4 className="font-bold text-sm text-emerald-950">
-                    EU General Data Protection Regulation (GDPR) & Lebanese Law 126/2019
-                  </h4>
-                  <p>
-                    961AI Network is architected under strict privacy-by-design principles. We process personal data solely for verified DeepTech matchmaking, founder-investor syndicate routing, and opt-in ecosystem newsletters.
-                  </p>
-                </div>
+        {/* Search Results List */}
+        <div className="max-h-[65vh] overflow-y-auto p-3 space-y-4 text-xs">
+          {/* Quick Action Tools */}
+          {quickActions.length > 0 && (
+            <div className="space-y-1">
+              <div className="px-3 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Quick Engines & Direct Actions
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                  <h5 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                    <Building2 className="w-4 h-4 text-emerald-600" />
-                    <span>Joint Data Controllers</span>
-                  </h5>
-                  <p className="text-xs text-slate-600">
-                    <strong>1. Al Khawarizmi Solutions</strong> (Technical Platform Architecture & Graph Infrastructure)<br />
-                    <strong>2. NCEI Lebanon</strong> (The National Council for Entrepreneurship and Innovation - Ecosystem Governance)
-                  </p>
-                  <p className="text-[11px] text-slate-500 font-mono">
-                    DPO Contact: dpo@961ai.network / privacy@alkharizmisolutions.com
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                  <h5 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                    <Globe className="w-4 h-4 text-blue-600" />
-                    <span>Lawful Basis for Processing (Art. 6 GDPR)</span>
-                  </h5>
-                  <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
-                    <li><strong>Consent (6(1)(a)):</strong> Explicit opt-in for newsletters & syndicate alerts.</li>
-                    <li><strong>Contractual (6(1)(b)):</strong> 6-hour demo access & Pro membership.</li>
-                    <li><strong>Legitimate Interest (6(1)(f)):</strong> Graph matchmaking for verified Lebanese startups.</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-bold text-slate-900 text-sm">Your Individual Rights Under GDPR</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                  <div className="p-3 rounded-lg border border-slate-200 bg-white shadow-2xs">
-                    <span className="font-bold text-slate-900 block">Art. 15 Right to Access</span>
-                    <span className="text-slate-500">Request a full copy of all data points and graph nodes linked to your profile.</span>
-                  </div>
-                  <div className="p-3 rounded-lg border border-slate-200 bg-white shadow-2xs">
-                    <span className="font-bold text-slate-900 block">Art. 17 Right to Erasure</span>
-                    <span className="text-slate-500">Purge your email, pitch deck summary, and entity claims at any time.</span>
-                  </div>
-                  <div className="p-3 rounded-lg border border-slate-200 bg-white shadow-2xs">
-                    <span className="font-bold text-slate-900 block">Art. 20 Data Portability</span>
-                    <span className="text-slate-500">Export your data in machine-readable JSON format with one click.</span>
-                  </div>
-                  <div className="p-3 rounded-lg border border-slate-200 bg-white shadow-2xs">
-                    <span className="font-bold text-slate-900 block">Art. 21 Right to Object</span>
-                    <span className="text-slate-500">Unsubscribe from ecosystem communications instantly without penalty.</span>
-                  </div>
-                </div>
+              <div className="space-y-1">
+                {quickActions.map((action) => (
+                  <button
+                    key={action.id}
+                    onClick={action.action}
+                    className="w-full px-3 py-2.5 rounded-xl hover:bg-[#F6FAF5] hover:border-[#B0CFAD] border border-transparent flex items-center justify-between text-left transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-[#EBF3EA]">
+                        {action.icon}
+                      </div>
+                      <div>
+                        <div className="font-bold text-[#000000] group-hover:text-[#2E5A2C]">
+                          {action.title}
+                        </div>
+                        <div className="text-[10px] text-slate-500">{action.category}</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#2E5A2C] group-hover:translate-x-0.5 transition-all" />
+                  </button>
+                ))}
               </div>
             </div>
           )}
 
-          {/* TAB 2: PRIVACY POLICY */}
-          {activeTab === "privacy" && (
-            <div className="space-y-4 animate-in fade-in duration-150">
-              <h3 className="text-base font-bold text-slate-900">961AI Network Comprehensive Privacy Policy</h3>
-              <p className="text-xs text-slate-600">Last Revised: August 31, 2026</p>
-
-              <div className="space-y-3 text-xs text-slate-700">
-                <h4 className="font-bold text-slate-900 text-sm">1. Information We Collect</h4>
-                <p>
-                  When you access 961AI Network (operated jointly by Al Khawarizmi Solutions and NCEI Lebanon), we collect:
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-slate-600">
-                  <li><strong>Account Registration & Demo:</strong> Full name, professional email address, organization affiliation, and selected user archetype (Founder, Investor, AI Guru, Agency).</li>
-                  <li><strong>Entity Questionnaire & Pitch Room:</strong> Startup valuation, funding targets, tech stack, team size, and uploaded pitch deck documents.</li>
-                  <li><strong>Communications & Interactions:</strong> Interaction requests, EdgeBot inquiries, and mailing list subscription records.</li>
-                </ul>
-
-                <h4 className="font-bold text-slate-900 text-sm mt-4">2. Purpose of Data Collection</h4>
-                <p>
-                  All captured data is strictly utilized to:
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-slate-600">
-                  <li>Provide automated AI-driven matchmaking between Lebanese startups, AI consultancies, and diaspora capital.</li>
-                  <li>Maintain the verified institutional directory and Layer 2 Karpathy-format Markdown wikis.</li>
-                  <li>Dispatch relevant ecosystem dispatches, syndicate deal invitations, and grant notifications via the platform mailing list.</li>
-                </ul>
-
-                <h4 className="font-bold text-slate-900 text-sm mt-4">3. Data Retention & Multi-Tenant Security</h4>
-                <p>
-                  User session data is stored securely utilizing Row Level Security (RLS) isolation. We do not sell or monetize personal data to third-party ad networks.
-                </p>
+          {/* Directory Entities */}
+          {matchingNodes.length > 0 && (
+            <div className="space-y-1">
+              <div className="px-3 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Directory Entities ({matchingNodes.length})
+              </div>
+              <div className="space-y-1">
+                {matchingNodes.map((node) => (
+                  <button
+                    key={node.id}
+                    onClick={() => {
+                      onClose();
+                      onSelectNode(node);
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl hover:bg-[#F6FAF5] hover:border-[#B0CFAD] border border-transparent flex items-center justify-between text-left transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-[#EBF3EA] border border-[#B0CFAD] flex items-center justify-center text-xs font-black text-[#2E5A2C]">
+                        {node.avatar || node.label.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-bold text-[#000000] flex items-center gap-2">
+                          <span>{node.label}</span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] bg-slate-100 text-slate-700 border border-slate-200">
+                            {node.type}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 truncate max-w-sm">
+                          {node.title || node.bio || node.location}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-[#2E5A2C] bg-[#EBF3EA] px-2 py-0.5 rounded border border-[#B0CFAD]">
+                      Open Profile
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
 
-          {/* TAB 3: TERMS OF SERVICE */}
-          {activeTab === "terms" && (
-            <div className="space-y-4 animate-in fade-in duration-150 text-xs">
-              <h3 className="text-base font-bold text-slate-900">Terms of Service & Platform Governance</h3>
-              <p className="text-slate-500">Effective as of August 2026</p>
-
-              <div className="space-y-3 text-slate-700 leading-relaxed">
-                <h4 className="font-bold text-slate-900 text-sm">1. Joint Platform Agreement</h4>
-                <p>
-                  By accessing or registering on 961AINetwork.org, you enter into a binding agreement with <strong>Al Khawarizmi Solutions</strong> and <strong>NCEI Lebanon</strong>. Access to directory graphs, syndicate matching, and offshore tax calculation copilots is subject to these terms.
-                </p>
-
-                <h4 className="font-bold text-slate-900 text-sm">2. 6-Hour Demo & $100/yr Pro Membership</h4>
-                <p>
-                  Every new registrant receives an initial 6-hour demo session. Access beyond the trial requires an active Annual Pro Membership ($100/yr) or an active verified Lebanese research/student grant pass.
-                </p>
-
-                <h4 className="font-bold text-slate-900 text-sm">3. Disclaimer on Investments & Tax Computations</h4>
-                <p>
-                  The syndicate matchmaking, offshore tax optimization calculators (Lebanese Law 126/2019 0% Offshore S.A.L. framework), and investment memos generated by the platform are for informational and intelligence purposes only. They do not constitute formal legal, financial, or tax advice.
-                </p>
+          {/* Knowledge Resources & Legal Codices */}
+          {matchingResources.length > 0 && (
+            <div className="space-y-1">
+              <div className="px-3 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Knowledge Resources & Legal Toolkits
+              </div>
+              <div className="space-y-1">
+                {matchingResources.map((res) => (
+                  <button
+                    key={res.id}
+                    onClick={() => {
+                      onClose();
+                      onNavigateToModule(8);
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl hover:bg-[#F6FAF5] hover:border-[#B0CFAD] border border-transparent flex items-center justify-between text-left transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-lg bg-emerald-50 text-[#2E5A2C] border border-[#B0CFAD]">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-[#000000] group-hover:text-[#2E5A2C]">
+                          {res.title}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {res.format} • {res.category}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-600">Read Toolkit</span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
 
-          {/* TAB 4: COOKIE POLICY */}
-          {activeTab === "cookies" && (
-            <div className="space-y-4 animate-in fade-in duration-150 text-xs">
-              <h3 className="text-base font-bold text-slate-900">Cookie & Local Storage Policy</h3>
-              <p className="text-slate-600">
-                961AI Network uses minimal, privacy-centric cookies and browser storage strictly required for authentication, 6-hour demo timer verification, and local settings.
-              </p>
-
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead className="bg-slate-100 text-slate-700 border-b border-slate-200">
-                    <tr>
-                      <th className="p-3">Key / Cookie Name</th>
-                      <th className="p-3">Type</th>
-                      <th className="p-3">Purpose</th>
-                      <th className="p-3">Duration</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 text-slate-600">
-                    <tr>
-                      <td className="p-3 font-bold text-slate-900">961ai_auth_user</td>
-                      <td className="p-3">LocalStorage</td>
-                      <td className="p-3">Maintains active session & demo countdown</td>
-                      <td className="p-3">Session / 6 Hours</td>
-                    </tr>
-                    <tr>
-                      <td className="p-3 font-bold text-slate-900">961ai_mailing_list</td>
-                      <td className="p-3">LocalStorage</td>
-                      <td className="p-3">Records verified mailing list subscriber status</td>
-                      <td className="p-3">Persistent (Until Erasure)</td>
-                    </tr>
-                    <tr>
-                      <td className="p-3 font-bold text-slate-900">admin_961_authenticated</td>
-                      <td className="p-3">SessionStorage</td>
-                      <td className="p-3">Secure admin console token</td>
-                      <td className="p-3">Browser Session</td>
-                    </tr>
-                  </tbody>
-                </table>
+          {/* News Dispatches */}
+          {matchingNews.length > 0 && (
+            <div className="space-y-1">
+              <div className="px-3 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                News Dispatches & Deals
+              </div>
+              <div className="space-y-1">
+                {matchingNews.map((article) => (
+                  <button
+                    key={article.id}
+                    onClick={() => {
+                      onClose();
+                      onNavigateToModule(8);
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl hover:bg-[#F6FAF5] hover:border-[#B0CFAD] border border-transparent flex items-center justify-between text-left transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600 border border-rose-200">
+                        <Newspaper className="w-4 h-4" />
+                      </div>
+                      <div className="truncate max-w-md">
+                        <div className="font-bold text-[#000000] truncate">{article.title}</div>
+                        <div className="text-[10px] text-slate-500">
+                          {article.category} • {article.publishedAt}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                      Story
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
 
-          {/* TAB 5: DSAR / SELF-SERVICE */}
-          {activeTab === "dsar" && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              <div className="p-4 rounded-xl bg-slate-900 text-white space-y-3">
-                <h4 className="font-bold text-sm flex items-center gap-2">
-                  <Download className="w-4 h-4 text-emerald-400" />
-                  <span>Instant GDPR Data Download (Article 20)</span>
-                </h4>
-                <p className="text-xs text-slate-300">
-                  Export all locally stored session tokens, mailing list records, and questionnaire draft files in standard JSON format:
-                </p>
-                <button
-                  onClick={handleDownloadUserData}
-                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Export My Personal Data (JSON)</span>
-                </button>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                <h4 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-rose-600" />
-                  <span>Data Subject Access Request (DSAR) Portal</span>
-                </h4>
-                <p className="text-xs text-slate-600">
-                  Enter your registered email address to submit a formal erasure, rectification, or unsubscribe request:
-                </p>
-
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="email"
-                    placeholder="Enter your registered email (e.g. founder@startup.lb)"
-                    value={dsarEmail}
-                    onChange={(e) => setDsarEmail(e.target.value)}
-                    className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-emerald-600"
-                  />
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleDsarRequest("unsubscribe")}
-                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold whitespace-nowrap cursor-pointer"
-                    >
-                      Unsubscribe
-                    </button>
-                    <button
-                      onClick={() => handleDsarRequest("erasure")}
-                      className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold whitespace-nowrap flex items-center gap-1 cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Erase My Records</span>
-                    </button>
-                  </div>
-                </div>
-
-                {dsarSubmitted && (
-                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs flex items-start gap-2 animate-in fade-in">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>{dsarSubmitted}</span>
-                  </div>
-                )}
-              </div>
+          {matchingNodes.length === 0 && matchingNews.length === 0 && matchingResources.length === 0 && quickActions.length === 0 && (
+            <div className="py-12 text-center text-slate-500 space-y-2">
+              <Search className="w-8 h-8 mx-auto text-slate-300" />
+              <div className="font-bold text-sm text-slate-700">No matching ecosystem assets found</div>
+              <div className="text-xs">Try searching for "Offshore S.A.L.", "CedarsLLM", "SAFE", or "Berytech".</div>
             </div>
           )}
-
         </div>
 
-        {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 shrink-0 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-          <div className="text-slate-600 flex items-center gap-2">
-            <span className="font-bold text-slate-900">Al Khawarizmi Solutions</span>
-            <span>&</span>
-            <span className="font-bold text-slate-900">NCEI Lebanon</span>
-            <span className="hidden md:inline">• Joint Innovation Initiative</span>
+        {/* Footer info bar */}
+        <div className="p-3 border-t border-[#D7E7D6] bg-[#FAFCFA] flex items-center justify-between text-[10px] text-slate-500">
+          <div className="flex items-center gap-2">
+            <span>Navigation:</span>
+            <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded">↑</kbd>
+            <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded">↓</kbd>
+            <span>Select:</span>
+            <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded">↵</kbd>
           </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText("https://961ai.network/legal");
-                setCopiedPolicy(true);
-                setTimeout(() => setCopiedPolicy(false), 2000);
-              }}
-              className="text-slate-500 hover:text-slate-800 font-mono text-[11px]"
-            >
-              {copiedPolicy ? "Link Copied!" : "Copy Legal Link"}
-            </button>
-            <button
-              onClick={onClose}
-              className="px-4 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs cursor-pointer"
-            >
-              Close Codex
-            </button>
-          </div>
+          <div>961AINetwork Global Command Engine</div>
         </div>
-
       </div>
     </div>
   );

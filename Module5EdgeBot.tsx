@@ -1,438 +1,333 @@
 import React, { useState } from "react";
-import { KnowledgeResource } from "../../types";
-import { generateReportPdf } from "../../utils/generateReportPdf";
 import { 
-  Printer, 
-  MessageCircle, 
-  Copy, 
-  Check, 
-  ArrowRight, 
-  ArrowLeft,
-  BookOpen, 
-  Sparkles, 
-  FileText, 
-  Building2, 
-  TrendingUp, 
+  Calculator, 
   DollarSign, 
-  ChevronLeft, 
-  ChevronRight, 
-  Flame, 
+  Percent, 
+  Building2, 
   CheckCircle2, 
-  Mail, 
-  Send, 
-  Share2,
-  Scale,
-  Globe,
-  ShieldCheck,
-  Layers,
-  Filter,
-  Download
+  Download, 
+  TrendingUp, 
+  ShieldCheck, 
+  FileSpreadsheet,
+  ArrowRight,
+  Info,
+  HelpCircle
 } from "lucide-react";
 
-interface InvestmentReportSectionProps {
-  onNavigateToInvestmentReports?: (reportId?: string) => void;
-  onNavigateToResources?: () => void;
-  onOpenResourceModal?: (resource: KnowledgeResource) => void;
-  investmentResource?: KnowledgeResource;
-}
+export const OffshoreTaxCalculatorModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+}> = ({ isOpen, onClose }) => {
+  const [teamSize, setTeamSize] = useState<number>(6);
+  const [avgDevSalaryUsd, setAvgDevSalaryUsd] = useState<number>(3200); // Monthly USD per dev
+  const [exportRevenueAnnualUsd, setExportRevenueAnnualUsd] = useState<number>(450000);
+  const [operationalOverheadUsd, setOperationalOverheadUsd] = useState<number>(25000); // Annual cloud/legal/office
 
-export const InvestmentReportSection: React.FC<InvestmentReportSectionProps> = ({
-  onNavigateToInvestmentReports,
-  onNavigateToResources,
-  onOpenResourceModal,
-  investmentResource
-}) => {
-  const [currentSlide, setCurrentSlide] = useState<number>(0);
-  const [copied, setCopied] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [newsletterEmail, setNewsletterEmail] = useState("");
-  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
+  if (!isOpen) return null;
 
-  const reports = [
-    {
-      id: "res_mena_lebanon_vc_2026",
-      key: "mena_lebanon_vc",
-      category: "Macro Trends",
-      badge: "EXECUTIVE OVERVIEW • 2026 DISPATCH",
-      tag: "MENA & Lebanon Venture Intelligence",
-      title: "Executive Overview: MENA & Lebanon Venture Capital Landscape 2026",
-      subtitle: "Capital Concentration, Top Investment Categories & Cross-Border Diaspora Models",
-      excerpt: "The MENA venture ecosystem exceeded $3B in deployed capital driven by GCC sovereign vehicles and late-stage mega-rounds. Meanwhile, Lebanon's bifurcated model pairs domestic DFI/impact backing with cross-border VC strategies.",
-      date: "August 2026",
-      publisher: "MAGNiTT, ZoomInvestors, CapLink & 961AI Intelligence",
-      bullets: [
-        "MENA total venture capital deployed exceeded $3 Billion in 2025/2026, pulling ahead of other emerging venture markets.",
-        "Over 70% of total MENA funding is absorbed by KSA and UAE, driven by sovereign wealth funds (PIF, Mubadala) and late-stage mega-rounds.",
-        "Top MENA categories: FinTech (~35%-40%), Enterprise Software & AI (~18%-22%), and E-Commerce & Logistics (~12%-15%).",
-        "Lebanon operates on a bifurcated model: Domestic Early-Stage & DFI/Impact (IM Fndng, Berytech, Globivest) vs Cross-Border VCs (B&Y, Cedar Mundi).",
-        "Outbound Strategy: Founders incorporate offshore (Delaware, UAE, UK) while maintaining Beirut R&D hubs for 3.6x engineering cost arbitrage."
-      ]
-    },
-    {
-      id: "res_lebanon_pe_vc_2026",
-      key: "pe_vc",
-      category: "Private Equity & Funds",
-      badge: "NEW REPORT • JAN 2026 EDITION",
-      tag: "Private Equity & Venture Capital",
-      title: "Lebanon Private Equity & Venture Capital Landscape 2026",
-      subtitle: "Market Overview, Deal Flow & Fund Directory",
-      excerpt: "Lebanon's private equity (PE) market is projected to reach US$586.67 million in total deal value, backed by roughly 14 active domestic PE funds and regional recovery interest. You can explore deeper metrics via the ZoomInvestors Directory.",
-      date: "January 2026",
-      publisher: "961AI Research Taskforce & ZoomInvestors",
-      bullets: [
-        "Lebanon hosts 14 active private equity funds headquartered in the country as of January 2026.",
-        "These funds have collectively invested more than $37.7 billion across 644 rounds in over 120 companies.",
-        "The average deal size in Lebanon's PE market stands at approximately US$12.16 million in 2025.",
-        "Lebanon's PE market is projected to reach US$586.67 million in total deal value in 2025, growing at a 3.43% compound annual growth rate through 2026.",
-        "Fund sizes range from the $50 million Lebanon Growth Capital Fund to Global Gate Capital's $6 billion-plus in assets under management (AUM)."
-      ]
-    },
-    {
-      id: "res_investment_report_2026",
-      key: "war_economics",
-      category: "Startup Economics",
-      badge: "2026 SPECIAL BRIEF",
-      tag: "Macroeconomics & Wartime Resilience",
-      title: "2026 Special Report: Startup Economics & Venture Capital in Times of War",
-      subtitle: "Macroeconomic Shocks, Geopolitical Volatility, and the Levantine Resilience Playbook",
-      excerpt: "Explore the comprehensive research report on navigating runway preservation, sovereign defense tech reallocations, and decoupled diaspora venture capital stacks.",
-      date: "August 2026",
-      publisher: "961AI Research Taskforce & Levant Capital Intelligence",
-      bullets: [
-        "Global military spending reached an all-time record of $2.52 Trillion in 2026 (+5.2% YoY).",
-        "Beirut tech ecosystem climbed 36 places to 341st globally with +46.3% YoY growth momentum.",
-        "Startup operating cost inflation model indicates a +23.0% burn spike (-2.8 months runway compression).",
-        "Recommended seed runway buffer of 18+ months backed by Virtual CFO (VCFO) scenario modeling."
-      ]
-    },
-    {
-      id: "res_vcfo_runway_defense_2026",
-      key: "vcfo_playbook",
-      category: "VC Strategy",
-      badge: "TACTICAL GUIDE",
-      tag: "VCFO & Burn Rate Modeling",
-      title: "Virtual CFO & Runway Resilience: The 2026 Burn-Rate Defense Guide",
-      subtitle: "Dynamic Financial Modeling & Fresh USD Payroll Guardrails",
-      excerpt: "A tactical operating guide for founders on structuring dynamic 18-month runway forecasts, establishing +20% inflation buffers, and managing dual-currency payroll without runway compression.",
-      date: "July 2026",
-      publisher: "VCFO Network & 961AI Finance Desk",
-      bullets: [
-        "Implement rolling 13-week direct cash flow forecasting to identify liquidity bottlenecks.",
-        "Segregate operating reserves into offshore yield accounts and domestic Fresh USD disbursement accounts.",
-        "Retain top engineering talent at 3.6x cost advantage with dollarized compensation."
-      ]
-    },
-    {
-      id: "res_offshore_treasury_2026",
-      key: "offshore_governance",
-      category: "Offshore & Governance",
-      badge: "LEGAL BLUEPRINT",
-      tag: "Law No. 85 & Tax Optimization",
-      title: "Decoupled Treasury Architectures: Offshore SAL & Delaware Flips",
-      subtitle: "Corporate Structuring for Capital Preservation and Diligence",
-      excerpt: "Step-by-step regulatory blueprints on executing a Delaware flip, establishing Lebanese Offshore SAL entities with 0% corporate income tax on foreign revenue, and securing clean investor onboarding.",
-      date: "June 2026",
-      publisher: "Beirut Legal Tech Group • MENA Advisory",
-      bullets: [
-        "0% corporate income tax on exported software revenues under Lebanese Law No. 85.",
-        "100% exemption from stamp duties on foreign commercial contracts and cross-border equity.",
-        "Delaware C-Corp TopCo allows Silicon Valley venture funds to deploy SAFEs seamlessly."
-      ]
-    }
-  ];
+  // Calculations
+  const annualPayroll = teamSize * avgDevSalaryUsd * 12;
+  const totalAnnualExpenses = annualPayroll + operationalOverheadUsd;
+  const taxableProfit = Math.max(0, exportRevenueAnnualUsd - totalAnnualExpenses);
 
-  const activeReport = reports[currentSlide];
+  // 1. Lebanon Offshore S.A.L. (0% Corporate Tax on foreign client exports, Fixed 5,000,000 LBP stamp fee ~ $55/year)
+  const lebanonOffshoreTax = 55; // Nominal annual flat stamp duty
+  const lebanonPayrollTaxExemption = 0; // Circular 165 direct fresh USD payroll incentives
+  const lebanonTotalTax = lebanonOffshoreTax;
+  const lebanonNetRetained = exportRevenueAnnualUsd - totalAnnualExpenses - lebanonTotalTax;
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
+  // 2. Delaware C-Corp / US Onshore (21% Federal + ~8% State + Franchise Tax)
+  const delawareCorpTaxRate = 0.28;
+  const delawareTotalTax = taxableProfit * delawareCorpTaxRate + 450; // Franchise tax
+  const delawareNetRetained = exportRevenueAnnualUsd - totalAnnualExpenses - delawareTotalTax;
 
-  const handleShareWhatsApp = () => {
-    const text = encodeURIComponent(
-      `*${activeReport.title}*\n\n` +
-      `${activeReport.excerpt}\n\n` +
-      `Read the full research report on 961AI Network:\n` +
-      `${window.location.origin}/#investment-reports?report=${activeReport.id}`
-    );
-    window.open(`https://wa.me/?text=${text}`, "_blank");
-  };
+  // 3. UAE Free Zone (DIFC / ADGM / DMCC - 9% Corporate Tax above AED 375k + ~$12k annual license & visa overhead)
+  const uaeTaxableUsdThreshold = 102000;
+  const uaeTaxableAmount = Math.max(0, taxableProfit - uaeTaxableUsdThreshold);
+  const uaeCorpTax = uaeTaxableAmount * 0.09;
+  const uaeLicenseAndVisaFees = 12500; // Annual office/visa/license in DIFC/DMCC
+  const uaeTotalTax = uaeCorpTax + uaeLicenseAndVisaFees;
+  const uaeNetRetained = exportRevenueAnnualUsd - totalAnnualExpenses - uaeTotalTax;
 
-  const handleCopyLink = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(`${window.location.origin}/#investment-reports?report=${activeReport.id}`);
-      setCopied(true);
-      showToast("Report link copied to clipboard!");
-      setTimeout(() => setCopied(false), 2500);
-    }
-  };
-
-  const handleDownloadPdf = () => {
-    try {
-      showToast("Generating PDF...");
-      setTimeout(() => {
-        try {
-          const dossier = {
-            id: activeReport.id,
-            slug: activeReport.key,
-            title: activeReport.title,
-            subtitle: activeReport.subtitle,
-            category: activeReport.category as any,
-            secondaryCategories: [],
-            date: activeReport.date,
-            readTime: "10 min read",
-            publisher: activeReport.publisher,
-            badge: activeReport.badge,
-            tagline: activeReport.tag,
-            excerpt: activeReport.excerpt,
-            keyMetrics: [
-              { label: "Category", value: activeReport.category, description: activeReport.tag, tone: "emerald" as const },
-              { label: "Date", value: activeReport.date, description: "Official 961AI Release", tone: "blue" as const }
-            ],
-            bulletHighlights: activeReport.bullets,
-            tags: [activeReport.category, activeReport.tag, "2026 Edition"]
-          };
-          generateReportPdf(dossier);
-          showToast(`PDF downloaded: ${activeReport.key}_report_2026.pdf`);
-        } catch (e) {
-          console.error("PDF generation failed:", e);
-          showToast("Failed to generate PDF");
-        }
-      }, 100);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleReadMore = () => {
-    if (onNavigateToInvestmentReports) {
-      onNavigateToInvestmentReports(activeReport.id);
-    } else if (onNavigateToResources) {
-      onNavigateToResources();
-    }
-  };
-
-  const handleSubscribeNewsletter = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newsletterEmail.trim() || !newsletterEmail.includes("@")) {
-      showToast("Please enter a valid email address");
-      return;
-    }
-    setNewsletterSubscribed(true);
-    showToast("Subscribed! You will receive monthly PE & VC dispatches.");
-    setNewsletterEmail("");
-    setTimeout(() => setNewsletterSubscribed(false), 5000);
-  };
-
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % reports.length);
-  };
-
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + reports.length) % reports.length);
-  };
+  // Savings vs Delaware
+  const savingsVsDelaware = Math.max(0, delawareTotalTax - lebanonTotalTax);
+  const runwayExtensionMonths = annualPayroll > 0 ? ((savingsVsDelaware / (annualPayroll / 12)).toFixed(1)) : "0";
 
   return (
-    <section 
-      id="investment-report-section" 
-      className="rounded-2xl bg-white border-2 border-[#B0CFAD] p-5 sm:p-6 shadow-xs font-mono text-[#000000] relative overflow-hidden transition-all space-y-4"
-    >
-      {/* Toast notification */}
-      {toastMessage && (
-        <div className="absolute top-3 right-3 z-20 px-3 py-1 rounded-lg bg-black text-white text-xs font-bold shadow-lg animate-in fade-in">
-          {toastMessage}
-        </div>
-      )}
-
-      {/* Top Header: Badge & Report Switcher Tabs */}
-      <div className="flex flex-col items-start justify-start gap-2.5 text-left">
-        <div className="flex flex-wrap items-center justify-start gap-2">
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#EBF3EA] text-[#2E5A2C] border border-[#75AC73] flex items-center gap-1 shadow-2xs">
-            <Sparkles className="w-3 h-3 text-[#2E5A2C]" />
-            <span>INVESTMENT REPORTS & RESEARCH</span>
-          </span>
-
-          <span className="text-[10px] font-bold text-[#2E5A2C] bg-[#F6FAF5] px-2 py-0.5 rounded-md border border-[#D7E7D6]">
-            {activeReport.badge}
-          </span>
-
-          <span className="text-[10px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-[#B0CFAD]">
-            Category: {activeReport.category}
-          </span>
-        </div>
-
-        {/* Switcher Pills Left-Aligned */}
-        <div className="flex flex-wrap items-center justify-start gap-1.5 bg-[#F6FAF5] p-1 rounded-xl border border-[#D7E7D6]">
-          {reports.map((rep, idx) => {
-            const isMena = rep.key === "mena_lebanon_vc";
-            const isActive = currentSlide === idx;
-            return (
-              <button
-                key={rep.id}
-                onClick={() => setCurrentSlide(idx)}
-                style={isActive || isMena ? { color: "#ffffff" } : undefined}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  isActive
-                    ? "bg-[#2E5A2C] text-white !text-white shadow-2xs"
-                    : isMena
-                    ? "bg-[#2E5A2C] text-white !text-white shadow-2xs hover:bg-[#3D633C]"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${isActive || isMena ? "bg-white" : "bg-slate-300"}`} />
-                <span style={isActive || isMena ? { color: "#ffffff" } : undefined} className={isActive || isMena ? "text-white !text-white font-bold" : ""}>
-                  {rep.key === "mena_lebanon_vc" ? "MENA & Lebanon VC Overview" :
-                   rep.key === "pe_vc" ? "PE & VC Landscape" :
-                   rep.key === "war_economics" ? "Wartime Economics" :
-                   rep.key === "vcfo_playbook" ? "VCFO & Burn Rate" : "Offshore SAL & Tax"}
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-150">
+      <div className="bg-white rounded-2xl border-2 border-[#B0CFAD] max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden font-mono">
+        {/* Modal Header */}
+        <div className="p-5 border-b border-[#D7E7D6] bg-[#FAFCFA] flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#EBF3EA] border border-[#B0CFAD] flex items-center justify-center text-[#2E5A2C]">
+              <Calculator className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-[#000000] leading-tight">
+                  Lebanon 0% Offshore S.A.L. & Runway Engine
+                </h2>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#EBF3EA] text-[#2E5A2C] border border-[#B0CFAD]">
+                  Decree-Law 46/1983
                 </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Left-Aligned Headline & Sub-headline / Excerpt */}
-      <div className="text-left w-full space-y-2">
-        <h2 
-          onClick={handleReadMore}
-          className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight hover:text-[#2E5A2C] transition-colors cursor-pointer leading-tight text-left"
-        >
-          {activeReport.title}
-        </h2>
-
-        {activeReport.subtitle && (
-          <p className="text-xs sm:text-sm font-semibold text-[#2E5A2C] text-left">
-            {activeReport.subtitle}
-          </p>
-        )}
-
-        <p className="text-xs sm:text-sm text-slate-600 font-sans leading-relaxed text-left">
-          {activeReport.excerpt}
-        </p>
-      </div>
-
-      {/* Newsletter Subscription Form with WhatsApp Broadcast Button Alongside */}
-      <div className="bg-[#F6FAF5] border border-[#D7E7D6] rounded-xl p-3 sm:p-3.5 flex flex-col md:flex-row items-center justify-between gap-3">
-        {/* Left text label */}
-        <div className="flex items-center gap-2.5 text-slate-800 text-xs font-semibold shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-[#EBF3EA] border border-[#B0CFAD] flex items-center justify-center text-[#2E5A2C] shrink-0">
-            <Mail className="w-4 h-4" />
+              </div>
+              <p className="text-xs text-slate-600 font-sans">
+                Simulate your tax delta and runway extension comparing Beirut Offshore S.A.L. vs. Delaware C-Corp vs. UAE Freezones.
+              </p>
+            </div>
           </div>
-          <div>
-            <div className="font-bold text-slate-900 leading-tight">Get Investment Intelligence Dispatches</div>
-            <div className="text-[11px] text-slate-500 font-normal font-sans">Monthly dealflow, fund teardowns & valuation memos</div>
-          </div>
+
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors"
+          >
+            Close
+          </button>
         </div>
 
-        {/* Subscription Form + WhatsApp Broadcast Button */}
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full md:w-auto">
-          {/* Email input form */}
-          <form onSubmit={handleSubscribeNewsletter} className="flex items-center gap-1.5 w-full sm:w-auto">
-            <input
-              type="email"
-              placeholder="Enter your email..."
-              value={newsletterEmail}
-              onChange={(e) => setNewsletterEmail(e.target.value)}
-              className="px-3 py-1.5 rounded-lg border border-[#B0CFAD] bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-[#2E5A2C] w-full sm:w-56"
-            />
+        {/* Modal Body */}
+        <div className="p-6 overflow-y-auto space-y-6 text-[#000000]">
+          {/* Top Inputs Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl bg-[#F6FAF5] border border-[#D7E7D6]">
+            {/* Input 1: Team Size */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span>Team Size (AI Devs)</span>
+                <span className="text-[#2E5A2C] font-black">{teamSize} engineers</span>
+              </label>
+              <input
+                type="range"
+                min={1}
+                max={40}
+                value={teamSize}
+                onChange={(e) => setTeamSize(Number(e.target.value))}
+                className="w-full accent-[#4D7D4B]"
+              />
+              <div className="flex justify-between text-[10px] text-slate-500">
+                <span>1 Dev</span>
+                <span>40 Devs</span>
+              </div>
+            </div>
+
+            {/* Input 2: Avg Monthly Salary */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span>Avg Monthly Salary</span>
+                <span className="text-[#2E5A2C] font-black">${avgDevSalaryUsd.toLocaleString()}/mo</span>
+              </label>
+              <input
+                type="range"
+                min={1200}
+                max={8500}
+                step={100}
+                value={avgDevSalaryUsd}
+                onChange={(e) => setAvgDevSalaryUsd(Number(e.target.value))}
+                className="w-full accent-[#4D7D4B]"
+              />
+              <div className="flex justify-between text-[10px] text-slate-500">
+                <span>$1.2k (Junior)</span>
+                <span>$8.5k (Principal)</span>
+              </div>
+            </div>
+
+            {/* Input 3: Export Annual Revenue */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span>Annual Foreign Revenue</span>
+                <span className="text-[#2E5A2C] font-black">${exportRevenueAnnualUsd.toLocaleString()}</span>
+              </label>
+              <input
+                type="range"
+                min={50000}
+                max={3000000}
+                step={25000}
+                value={exportRevenueAnnualUsd}
+                onChange={(e) => setExportRevenueAnnualUsd(Number(e.target.value))}
+                className="w-full accent-[#4D7D4B]"
+              />
+              <div className="flex justify-between text-[10px] text-slate-500">
+                <span>$50k</span>
+                <span>$3.0M+</span>
+              </div>
+            </div>
+
+            {/* Input 4: Overhead */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span>Annual Cloud/Legal</span>
+                <span className="text-[#2E5A2C] font-black">${operationalOverheadUsd.toLocaleString()}</span>
+              </label>
+              <input
+                type="range"
+                min={5000}
+                max={150000}
+                step={5000}
+                value={operationalOverheadUsd}
+                onChange={(e) => setOperationalOverheadUsd(Number(e.target.value))}
+                className="w-full accent-[#4D7D4B]"
+              />
+              <div className="flex justify-between text-[10px] text-slate-500">
+                <span>$5k</span>
+                <span>$150k</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Key Metric Highlight Strip */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 rounded-xl bg-[#EBF3EA] border-2 border-[#B0CFAD] space-y-1">
+              <div className="text-[11px] font-bold text-[#2E5A2C] uppercase tracking-wider flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span>Annual Tax & Fee Savings</span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-[#2E5A2C]">
+                +${Math.round(savingsVsDelaware).toLocaleString()}
+              </div>
+              <div className="text-[11px] text-slate-700 font-sans">
+                Retained capital vs. US Delaware structure.
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-white border-2 border-[#D7E7D6] space-y-1">
+              <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#4D7D4B]" />
+                <span>Runway Extended</span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-[#000000]">
+                +{runwayExtensionMonths} Months
+              </div>
+              <div className="text-[11px] text-slate-700 font-sans">
+                Extra developer burn financed purely by zero corporate tax.
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-white border-2 border-[#D7E7D6] space-y-1">
+              <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                <Percent className="w-3.5 h-3.5 text-[#4D7D4B]" />
+                <span>Effective Tax Rate</span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-[#2E5A2C]">
+                0.01%
+              </div>
+              <div className="text-[11px] text-slate-700 font-sans">
+                Subject only to flat 5M LBP annual stamp duty.
+              </div>
+            </div>
+          </div>
+
+          {/* Detailed 3-Jurisdiction Comparative Ledger */}
+          <div className="rounded-xl border border-[#D7E7D6] overflow-hidden">
+            <div className="bg-[#F6FAF5] px-4 py-3 border-b border-[#D7E7D6] flex items-center justify-between">
+              <span className="font-bold text-xs text-[#000000] flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-[#4D7D4B]" />
+                <span>Jurisdictional Breakdown (Annual USD Basis)</span>
+              </span>
+              <span className="text-[10px] text-slate-500 font-sans">Simulated 2026 Fiscal Framework</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-[#D7E7D6] text-slate-700 font-bold text-[11px]">
+                    <th className="p-3">Jurisdiction</th>
+                    <th className="p-3">Gross Revenue</th>
+                    <th className="p-3">Payroll & Burn</th>
+                    <th className="p-3">Tax & Gov Fees</th>
+                    <th className="p-3 text-right">Net Cash Retained</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EBF3EA]">
+                  {/* Lebanon Offshore S.A.L. */}
+                  <tr className="bg-[#F6FAF5]/60 hover:bg-[#EBF3EA]/80 transition-colors font-bold">
+                    <td className="p-3 flex items-center gap-2">
+                      <span className="text-base">🇱🇧</span>
+                      <div>
+                        <div className="text-[#2E5A2C] font-black">Lebanon Offshore S.A.L.</div>
+                        <div className="text-[10px] text-slate-500 font-normal">Decree-Law 46/1983 • 0% Export CIT</div>
+                      </div>
+                    </td>
+                    <td className="p-3">${exportRevenueAnnualUsd.toLocaleString()}</td>
+                    <td className="p-3">${totalAnnualExpenses.toLocaleString()}</td>
+                    <td className="p-3 text-[#2E5A2C] font-black">${lebanonTotalTax.toLocaleString()}</td>
+                    <td className="p-3 text-right text-base text-[#2E5A2C] font-black">
+                      ${Math.round(lebanonNetRetained).toLocaleString()}
+                    </td>
+                  </tr>
+
+                  {/* UAE Freezone (DIFC/ADGM) */}
+                  <tr className="hover:bg-slate-50 transition-colors">
+                    <td className="p-3 flex items-center gap-2">
+                      <span className="text-base">🇦🇪</span>
+                      <div>
+                        <div className="font-bold text-[#000000]">UAE Free Zone (DIFC/ADGM)</div>
+                        <div className="text-[10px] text-slate-500">9% CIT above AED 375k + License Costs</div>
+                      </div>
+                    </td>
+                    <td className="p-3">${exportRevenueAnnualUsd.toLocaleString()}</td>
+                    <td className="p-3">${totalAnnualExpenses.toLocaleString()}</td>
+                    <td className="p-3 text-rose-700 font-bold">${Math.round(uaeTotalTax).toLocaleString()}</td>
+                    <td className="p-3 text-right font-bold text-[#000000]">
+                      ${Math.round(uaeNetRetained).toLocaleString()}
+                    </td>
+                  </tr>
+
+                  {/* Delaware C-Corp */}
+                  <tr className="hover:bg-slate-50 transition-colors">
+                    <td className="p-3 flex items-center gap-2">
+                      <span className="text-base">🇺🇸</span>
+                      <div>
+                        <div className="font-bold text-[#000000]">US Delaware C-Corp</div>
+                        <div className="text-[10px] text-slate-500">21% Fed + State CIT + Franchise Tax</div>
+                      </div>
+                    </td>
+                    <td className="p-3">${exportRevenueAnnualUsd.toLocaleString()}</td>
+                    <td className="p-3">${totalAnnualExpenses.toLocaleString()}</td>
+                    <td className="p-3 text-rose-700 font-bold">${Math.round(delawareTotalTax).toLocaleString()}</td>
+                    <td className="p-3 text-right font-bold text-[#000000]">
+                      ${Math.round(delawareNetRetained).toLocaleString()}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Legal Footnotes */}
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-700 space-y-2 font-sans">
+            <div className="font-bold text-slate-900 flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 text-[#4D7D4B]" />
+              <span>Key Structuring Pillars for Lebanese DeepTech Startups:</span>
+            </div>
+            <ul className="list-disc pl-5 space-y-1 text-slate-600">
+              <li><strong>Foreign Client Invoicing:</strong> All AI SaaS subscriptions, custom models, and advisory contracts billed to clients outside Lebanon are completely exempt from 17% corporate income tax.</li>
+              <li><strong>Fresh Dollar Banking (BDL Circular 165):</strong> Local fresh dollar accounts are segregated from legacy balance sheets, enabling frictionless inbound SWIFT and outbound payroll.</li>
+              <li><strong>Hybrid Delaware-Lebanon Sandwich:</strong> Standard institutional setup: Incorporate a Delaware C-Corp or Cayman HoldCo for US/GCC VC fundraising while operating 100% of R&D as a wholly owned Lebanese Offshore S.A.L. subsidiary under cost-plus model.</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Modal Footer */}
+        <div className="p-4 border-t border-[#D7E7D6] bg-[#FAFCFA] flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="text-slate-600 font-sans">
+            Need a turnkey Offshore S.A.L. registration or standard cost-plus transfer pricing agreement?
+          </div>
+          <div className="flex items-center gap-2">
             <button
-              type="submit"
-              className="px-3 py-1.5 rounded-lg bg-[#2E5A2C] hover:bg-[#1E3B1D] text-white text-xs font-bold shadow-2xs transition-all active:scale-95 shrink-0 flex items-center gap-1 cursor-pointer"
+              onClick={() => window.print()}
+              className="px-3.5 py-1.5 bg-white border border-[#D7E7D6] hover:bg-[#EBF3EA] text-[#000000] rounded-lg font-bold flex items-center gap-1.5 transition-colors"
             >
-              {newsletterSubscribed ? (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Joined</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-3 h-3" />
-                  <span>Subscribe</span>
-                </>
-              )}
+              <Download className="w-3.5 h-3.5 text-[#4D7D4B]" />
+              <span>Export PDF Pro-Forma</span>
             </button>
-          </form>
-
-          {/* WhatsApp Sharing Button Alongside Form */}
-          <button
-            onClick={handleShareWhatsApp}
-            className="px-3 py-1.5 rounded-lg bg-[#25D366] hover:bg-[#1EBE5D] text-white shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 text-xs font-bold shrink-0 w-full sm:w-auto"
-            title="Broadcast report excerpt via WhatsApp to your professional network"
-          >
-            <MessageCircle className="w-3.5 h-3.5 fill-white" />
-            <span>WhatsApp Broadcast</span>
-          </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 bg-[#4D7D4B] hover:bg-[#3D633C] text-white rounded-lg font-bold transition-colors"
+            >
+              Done
+            </button>
+          </div>
         </div>
       </div>
-
-      {/* Action Buttons as Bottom of Section */}
-      <div className="border-t border-[#D7E7D6] pt-3.5 flex flex-wrap items-center justify-between gap-3">
-        {/* Left Side: Slide Navigator */}
-        <div className="flex items-center gap-1 bg-[#F6FAF5] rounded-xl border border-[#D7E7D6] p-1">
-          <button
-            onClick={prevSlide}
-            className="p-1.5 rounded-lg hover:bg-white text-slate-600 hover:text-[#2E5A2C] transition-colors cursor-pointer"
-            title="Previous Report"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className="text-xs font-bold px-2 text-slate-600 font-mono">
-            {currentSlide + 1} / {reports.length}
-          </span>
-          <button
-            onClick={nextSlide}
-            className="p-1.5 rounded-lg hover:bg-white text-slate-600 hover:text-[#2E5A2C] transition-colors cursor-pointer"
-            title="Next Report"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Right Side: Secondary Actions & Main Read More Button */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={handleDownloadPdf}
-            className="p-2 rounded-xl bg-white hover:bg-[#F6FAF5] text-[#2E5A2C] border border-[#B0CFAD] shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center gap-1 text-xs font-bold"
-            title="Download formatted PDF of this report"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Download PDF</span>
-          </button>
-
-          <button
-            onClick={handlePrint}
-            className="p-2 rounded-xl bg-white hover:bg-[#F6FAF5] text-slate-700 border border-slate-300 shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center gap-1 text-xs font-bold"
-            title="Print / Save PDF"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Print</span>
-          </button>
-
-          <button
-            onClick={handleCopyLink}
-            className="p-2 rounded-xl bg-white hover:bg-[#F6FAF5] text-slate-700 border border-slate-300 shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center gap-1 text-xs font-bold"
-            title="Copy Report Link"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">Copy Link</span>
-          </button>
-
-          <button
-            onClick={handleReadMore}
-            style={{ color: "#ffffff" }}
-            className="px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 !text-white text-xs font-black shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-          >
-            <BookOpen className="w-3.5 h-3.5 !text-white text-white" style={{ color: "#ffffff" }} />
-            <span style={{ color: "#ffffff" }} className="!text-white font-black">Explore All Research Dossiers</span>
-            <ArrowRight className="w-3.5 h-3.5 !text-white text-white" style={{ color: "#ffffff" }} />
-          </button>
-        </div>
-      </div>
-    </section>
+    </div>
   );
 };

@@ -1,1252 +1,954 @@
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  Brain,
-  Sparkles,
-  BookOpen,
-  FileText,
-  Upload,
-  Plus,
-  Search,
-  Trash2,
-  Edit3,
-  Save,
-  Copy,
-  Check,
-  Headphones,
-  Send,
-  Folder,
-  Tag,
-  Pin,
-  Download,
-  RotateCcw,
-  Volume2,
-  ShieldCheck,
-  Layers,
+import React, { useState, useMemo } from "react";
+import { GraphNode, GraphEdge, IntroductionRequestLog } from "../../types";
+import { 
+  Search, 
+  MapPin, 
+  Globe, 
+  ShieldCheck, 
+  Sparkles, 
+  CheckCircle2, 
+  Layers, 
+  ArrowUpRight, 
+  Users, 
+  Building2, 
+  Briefcase, 
+  GraduationCap, 
+  Filter, 
+  Send, 
+  ExternalLink, 
+  Network, 
+  Clock, 
+  Star, 
+  Laptop, 
+  Award,
   ArrowRight,
-  ExternalLink,
-  Cpu,
-  Scale,
-  TrendingUp,
-  CheckSquare,
-  Square,
-  Play,
-  Pause,
-  Phone,
-  UserPlus,
-  ListTodo,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
-  MessageSquare,
-  Bookmark,
-  Compass
+  ArrowLeft,
+  Check,
+  RotateCcw,
+  Lock
 } from "lucide-react";
-import { PlatformCoreModulesBar } from "../workspace/PlatformCoreModulesBar";
-import {
-  UserAuthSession,
-  WorkspaceEntry,
-  WorkspaceCategory,
-  Z961Workspace
-} from "../../types";
-import {
-  getZ961Workspace,
-  addWorkspaceEntry,
-  askZ961BrainCopilot,
-  generateZ961AudioOverview,
-  sendZ24sevenWhatsAppWebhook
-} from "../../lib/z961SecondBrainService";
-import { WhatsAppIntegrationModal } from "../secondBrain/WhatsAppIntegrationModal";
-import { SystemArchitectureModal } from "../secondBrain/SystemArchitectureModal";
+import { UserAuthSession } from "../../types";
 
-interface ModuleSecondBrainNotebookProps {
-  user: UserAuthSession | null;
-  onOpenPricing?: () => void;
-  onNavigateToDirectory?: (searchQuery?: string) => void;
-  onNavigateToSandbox?: () => void;
-  onNavigateToPitchRoom?: () => void;
-  onNavigateToHome?: () => void;
-  onNavigateToReports?: () => void;
-  onNavigateToModule?: (moduleId: number) => void;
+interface ModuleYellowPagesDirectoryProps {
+  nodes: GraphNode[];
+  edges?: GraphEdge[];
+  onSelectNode: (node: GraphNode) => void;
+  deductCredits: (amount: number) => boolean;
+  credits: number;
+  onNavigateToHome: () => void;
+  onNavigateToQuestionnaire?: () => void;
+  onNavigateToMarketplace?: () => void;
+  onOpenGraphView?: () => void;
+  user?: UserAuthSession | null;
   onOpenAuth?: (mode?: "signin" | "signup", reason?: string) => void;
-  deductCredits?: (amount: number) => boolean;
-  credits?: number;
+  initialSearchQuery?: string;
 }
 
-export const ModuleSecondBrainNotebook: React.FC<ModuleSecondBrainNotebookProps> = ({
-  user,
-  onOpenPricing,
-  onNavigateToDirectory,
-  onNavigateToSandbox,
-  onNavigateToPitchRoom,
-  onNavigateToHome,
-  onNavigateToReports,
-  onNavigateToModule,
-  onOpenAuth,
+export const ModuleYellowPagesDirectory: React.FC<ModuleYellowPagesDirectoryProps> = ({
+  nodes,
+  onSelectNode,
   deductCredits,
-  credits = 1450
+  credits,
+  onNavigateToHome,
+  onNavigateToQuestionnaire,
+  onNavigateToMarketplace,
+  onOpenGraphView,
+  user,
+  onOpenAuth,
+  initialSearchQuery = ""
 }) => {
-  // Toggle Core Modules Bar
-  const [showCoreModules, setShowCoreModules] = useState(false);
+  // Search & Filter States
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
 
-  // Active Workspace State
-  const [workspace, setWorkspace] = useState<Z961Workspace | null>(null);
-  const [isLoadingWorkspace, setIsLoadingWorkspace] = useState<boolean>(true);
-
-  // Filter & Search States
-  const [selectedCategory, setSelectedCategory] = useState<WorkspaceCategory | "all">("all");
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [selectedEntryIds, setSelectedEntryIds] = useState<string[]>([]);
-  const [activeViewingEntryId, setActiveViewingEntryId] = useState<string>("");
-
-  // Center Canvas View: "chat" (AI Copilot) vs "document" (Markdown Viewer)
-  const [activeCenterView, setActiveCenterView] = useState<"chat" | "document">("chat");
-
-  // AI Copilot Chat State
-  const [queryInput, setQueryInput] = useState<string>("");
-  const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
-  const [chatMessages, setChatMessages] = useState<Array<{
-    id: string;
-    sender: "user" | "copilot";
-    text: string;
-    timestamp: string;
-    citations?: string[];
-    groundingConfidence?: number;
-    sourcesUsed?: string[];
-  }>>([
-    {
-      id: "msg_welcome",
-      sender: "copilot",
-      text: "Welcome to your Sovereign **z961 Second Brain Workspace**.\n\nI am your grounded intelligence copilot. I synthesize deal intelligence, legal frameworks (BDL Circular 165), CRM profiles, and research documents with zero hallucination. Every response cites your ingested sources directly.\n\nHow can I help you advance your venture today?",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      groundingConfidence: 100
+  React.useEffect(() => {
+    if (initialSearchQuery) {
+      setSearchQuery(initialSearchQuery);
     }
-  ]);
+  }, [initialSearchQuery]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [locationFilter, setLocationFilter] = useState<"ALL" | "onshore" | "diaspora" | "servesLebanon">("ALL");
+  const [stageFilter, setStageFilter] = useState<string>("ALL");
+  const [hourlyRateFilter, setHourlyRateFilter] = useState<string>("ALL");
+  const [selectedTechTag, setSelectedTechTag] = useState<string>("ALL");
+  const [selectedService, setSelectedService] = useState<string>("ALL");
 
-  // Audio Deep Dive Studio State
-  const [isGeneratingAudio, setIsGeneratingAudio] = useState<boolean>(false);
-  const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
-  const [currentDialogueIndex, setCurrentDialogueIndex] = useState<number>(0);
-  const [audioOverview, setAudioOverview] = useState<{
-    title: string;
-    duration: string;
-    summary: string;
-    dialogue: Array<{ speaker: string; text: string }>;
-  } | null>(null);
+  // Intro Request Modal State
+  const [introTarget, setIntroTarget] = useState<GraphNode | null>(null);
+  const [pitchNote, setPitchNote] = useState("");
+  const [isSubmittingIntro, setIsSubmittingIntro] = useState(false);
+  const [introSuccessMsg, setIntroSuccessMsg] = useState<string | null>(null);
+  const [toastFeedback, setToastFeedback] = useState<string | null>(null);
 
-  // New Source / Document Modal
-  const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState<boolean>(false);
-  const [newTitle, setNewTitle] = useState<string>("");
-  const [newCategory, setNewCategory] = useState<WorkspaceCategory>("research");
-  const [newText, setNewText] = useState<string>("");
-  const [newTags, setNewTags] = useState<string>("Lebanese AI, Research");
-  const [isSubmittingNewSource, setIsSubmittingNewSource] = useState<boolean>(false);
+  const showToast = (msg: string) => {
+    setToastFeedback(msg);
+    setTimeout(() => setToastFeedback(null), 3000);
+  };
 
-  // Inline Quick Task State
-  const [newFollowupTask, setNewFollowupTask] = useState<string>("");
-  const [newFollowupPriority, setNewFollowupPriority] = useState<"urgent" | "high" | "normal">("high");
+  const agencyNodesCount = nodes.filter(n => n.rating !== undefined || n.servicesBreakdown !== undefined || n.minProjectSize !== undefined).length;
+  const startupNodesCount = nodes.filter(n => n.type === "Startup" && n.rating === undefined && n.servicesBreakdown === undefined).length;
 
-  // Modals
-  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState<boolean>(false);
-  const [isArchModalOpen, setIsArchModalOpen] = useState<boolean>(false);
+  const categories = [
+    { id: "ALL", label: "All Directory", icon: Layers, count: nodes.filter(n => n.type !== "Skill" && n.type !== "Location").length },
+    { id: "Agency", label: "Software & AI Agencies", icon: Laptop, count: agencyNodesCount },
+    { id: "Startup", label: "Startups & Labs", icon: Building2, count: startupNodesCount },
+    { id: "Guru", label: "Gurus & Talent", icon: Users, count: nodes.filter(n => n.type === "Guru").length },
+    { id: "Investor", label: "Investors & VCs", icon: Briefcase, count: nodes.filter(n => n.type === "Investor").length },
+    { id: "Hub", label: "Universities & Hubs", icon: GraduationCap, count: nodes.filter(n => n.type === "Hub").length },
+  ];
 
-  // Load Workspace on mount and on user change
-  useEffect(() => {
-    let isMounted = true;
-    setIsLoadingWorkspace(true);
+  const subServices = [
+    "ALL",
+    "AI Development",
+    "Custom Software",
+    "Generative AI",
+    "Mobile App Development",
+    "Cloud Consulting & SI",
+    "NLP (Arabic Dialects)",
+    "AI Agents",
+    "BI & Big Data",
+    "ERP Consulting",
+    "CRM Consulting",
+    "IT Staff Augmentation",
+    "Computer Vision",
+    "FinTech",
+    "Robotics",
+    "University AI Lab"
+  ];
 
-    getZ961Workspace(user)
-      .then((ws) => {
-        if (isMounted) {
-          setWorkspace(ws);
-          // Default select all entries for grounded synthesis
-          const allIds = ws.entries.map((e) => e.id);
-          setSelectedEntryIds(allIds);
-          if (ws.entries.length > 0 && !activeViewingEntryId) {
-            setActiveViewingEntryId(ws.entries[0].id);
-          }
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load workspace:", err);
-      })
-      .finally(() => {
-        if (isMounted) setIsLoadingWorkspace(false);
-      });
+  const stages = ["ALL", "Pre-Seed", "Seed", "Series A", "Bootstrapped", "Angel / Micro-Fund", "$1k+ Projects", "$5k+ Projects", "$10k+ Projects", "$25k+ Enterprise"];
+  const hourlyRates = ["ALL", "< $25 / hr", "$25 - $49 / hr", "$50 - $99 / hr", "$100 - $149 / hr"];
 
-    return () => {
-      isMounted = false;
-    };
-  }, [user]);
-
-  // Filtered Entries for Left Panel
-  const filteredEntries = useMemo(() => {
-    if (!workspace) return [];
-    return workspace.entries.filter((entry) => {
-      const matchesCategory = selectedCategory === "all" || entry.category === selectedCategory;
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        entry.title.toLowerCase().includes(q) ||
-        entry.contentPayload.text.toLowerCase().includes(q) ||
-        entry.contentPayload.tags?.some((t) => t.toLowerCase().includes(q));
-      return matchesCategory && matchesSearch;
+  // Extract all distinct tech tags
+  const allTechTags = useMemo(() => {
+    const set = new Set<string>();
+    nodes.forEach(n => {
+      if (n.tags) n.tags.forEach(t => set.add(t));
     });
-  }, [workspace, selectedCategory, searchQuery]);
+    return Array.from(set).slice(0, 16);
+  }, [nodes]);
 
-  // Currently active viewing entry in document reader
-  const activeEntry = useMemo(() => {
-    if (!workspace) return null;
-    return workspace.entries.find((e) => e.id === activeViewingEntryId) || workspace.entries[0] || null;
-  }, [workspace, activeViewingEntryId]);
+  // Filtered Entities
+  const filteredNodes = useMemo(() => {
+    return nodes.filter(n => {
+      // Exclude pure meta skill/location nodes from entity cards
+      if (n.type === "Skill" || n.type === "Location") return false;
 
-  // Selected entries for Grounded RAG
-  const selectedEntries = useMemo(() => {
-    if (!workspace) return [];
-    return workspace.entries.filter((e) => selectedEntryIds.includes(e.id));
-  }, [workspace, selectedEntryIds]);
+      const isAgencyNode = n.rating !== undefined || n.servicesBreakdown !== undefined || n.minProjectSize !== undefined;
 
-  // Tasks / Follow-ups for Right Panel
-  const followUpEntries = useMemo(() => {
-    if (!workspace) return [];
-    return workspace.entries.filter((e) => e.category === "followup");
-  }, [workspace]);
-
-  // Audio Playback Timer
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isPlayingAudio && audioOverview && audioOverview.dialogue.length > 0) {
-      timer = setTimeout(() => {
-        setCurrentDialogueIndex((prev) => {
-          if (prev + 1 < audioOverview.dialogue.length) {
-            return prev + 1;
-          } else {
-            setIsPlayingAudio(false);
-            return 0;
-          }
-        });
-      }, 4200);
-    }
-    return () => clearTimeout(timer);
-  }, [isPlayingAudio, currentDialogueIndex, audioOverview]);
-
-  // Toggle entry selection for AI context
-  const toggleEntrySelection = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedEntryIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
-
-  // Select / Deselect All
-  const handleToggleSelectAll = () => {
-    if (selectedEntryIds.length === filteredEntries.length) {
-      setSelectedEntryIds([]);
-    } else {
-      setSelectedEntryIds(filteredEntries.map((e) => e.id));
-    }
-  };
-
-  // Handle Query Submission to Grounded AI Copilot
-  const handleSendQuery = async (queryText?: string) => {
-    const q = (queryText || queryInput).trim();
-    if (!q || isSynthesizing) return;
-
-    if (!user) {
-      onOpenAuth?.("signup", "Sign up free to execute zero-hallucination RAG queries against your Second Brain");
-      return;
-    }
-
-    const userMsgId = `user_${Date.now()}`;
-    const newMsg = {
-      id: userMsgId,
-      sender: "user" as const,
-      text: q,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    setChatMessages((prev) => [...prev, newMsg]);
-    setQueryInput("");
-    setIsSynthesizing(true);
-    setActiveCenterView("chat");
-
-    try {
-      const response = await askZ961BrainCopilot(user, q, selectedEntryIds);
-      const copilotMsgId = `copilot_${Date.now()}`;
-
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: copilotMsgId,
-          sender: "copilot",
-          text: response.answer,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          citations: response.citations,
-          groundingConfidence: response.confidence,
-          sourcesUsed: response.sourcesUsed
-        }
-      ]);
-    } catch (err: any) {
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: `copilot_err_${Date.now()}`,
-          sender: "copilot",
-          text: "I encountered an error synthesizing response from your workspace sources. Please verify your selected documents and try again.",
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          groundingConfidence: 0
-        }
-      ]);
-    } finally {
-      setIsSynthesizing(false);
-    }
-  };
-
-  // Generate Google NotebookLM-Style Audio Deep Dive
-  const handleGenerateAudio = async () => {
-    if (!user) {
-      onOpenAuth?.("signup", "Generate 2-host audio deep dives from your Second Brain");
-      return;
-    }
-
-    setIsGeneratingAudio(true);
-    try {
-      const audioRes = await generateZ961AudioOverview(user, selectedEntryIds);
-      setAudioOverview(audioRes);
-      setCurrentDialogueIndex(0);
-      setIsPlayingAudio(true);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsGeneratingAudio(false);
-    }
-  };
-
-  // Add Source from Modal
-  const handleAddSourceSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) {
-      onOpenAuth?.("signup", "Add custom research and documents to your personal Second Brain");
-      return;
-    }
-
-    if (!newTitle.trim() || !newText.trim()) return;
-
-    setIsSubmittingNewSource(true);
-    try {
-      const tagsArray = newTags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean);
-
-      const entry = await addWorkspaceEntry(user, {
-        category: newCategory,
-        sourceType: "file_upload",
-        title: newTitle.trim(),
-        text: newText.trim(),
-        tags: tagsArray.length > 0 ? tagsArray : ["Custom Entry"]
-      });
-
-      if (workspace) {
-        setWorkspace({
-          ...workspace,
-          entries: [entry, ...workspace.entries]
-        });
+      // Category filter
+      if (selectedCategory === "Agency") {
+        if (!isAgencyNode) return false;
+      } else if (selectedCategory === "Startup") {
+        if (n.type !== "Startup" || isAgencyNode) return false;
+      } else if (selectedCategory !== "ALL" && n.type !== selectedCategory) {
+        return false;
       }
-      setSelectedEntryIds((prev) => [entry.id, ...prev]);
-      setActiveViewingEntryId(entry.id);
-      setIsAddSourceModalOpen(false);
-      setNewTitle("");
-      setNewText("");
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSubmittingNewSource(false);
-    }
-  };
 
-  // Quick Add Follow-up Task in Panel C
-  const handleAddQuickTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFollowupTask.trim()) return;
-    if (!user) {
-      onOpenAuth?.("signup", "Save actionable tasks and track follow-ups");
-      return;
-    }
+      // Location filter
+      if (locationFilter === "onshore" && (n.isDiaspora || n.location?.toLowerCase().includes("serves lebanon"))) return false;
+      if (locationFilter === "diaspora" && !n.isDiaspora) return false;
+      if (locationFilter === "servesLebanon" && !n.servesLebanon && !n.location?.toLowerCase().includes("serves lebanon") && !n.location?.toLowerCase().includes("lebanon")) return false;
 
-    try {
-      const entry = await addWorkspaceEntry(user, {
-        category: "followup",
-        sourceType: "web_clipper",
-        title: newFollowupTask.trim().slice(0, 60),
-        text: newFollowupTask.trim(),
-        tags: ["ActionItem", "FollowUp", newFollowupPriority.toUpperCase()],
-        followupDetails: {
-          task: newFollowupTask.trim(),
-          priority: newFollowupPriority,
-          completed: false,
-          dueDate: new Date(Date.now() + 7 * 86400 * 1000).toISOString().split("T")[0]
-        }
-      });
-
-      if (workspace) {
-        setWorkspace({
-          ...workspace,
-          entries: [entry, ...workspace.entries]
-        });
+      // Stage filter
+      if (stageFilter !== "ALL") {
+        if (!n.stage || !n.stage.toLowerCase().includes(stageFilter.toLowerCase())) return false;
       }
-      setNewFollowupTask("");
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
-  // Toggle Task Completion
-  const handleToggleTask = (taskId: string) => {
-    if (!workspace) return;
-    const updatedEntries = workspace.entries.map((e) => {
-      if (e.id === taskId && e.contentPayload.followupDetails) {
-        return {
-          ...e,
-          contentPayload: {
-            ...e.contentPayload,
-            followupDetails: {
-              ...e.contentPayload.followupDetails,
-              completed: !e.contentPayload.followupDetails.completed
-            }
-          }
-        };
+      // Hourly Rate filter
+      if (hourlyRateFilter !== "ALL") {
+        if (!n.hourlyRate || !n.hourlyRate.toLowerCase().includes(hourlyRateFilter.toLowerCase())) return false;
       }
-      return e;
+
+      // Tech tag filter
+      if (selectedTechTag !== "ALL") {
+        if (!n.tags || !n.tags.includes(selectedTechTag)) return false;
+      }
+
+      // Sub-service filter
+      if (selectedService !== "ALL") {
+        const matchesTitle = n.title && n.title.toLowerCase().includes(selectedService.toLowerCase());
+        const matchesTags = n.tags && n.tags.some(t => t.toLowerCase().includes(selectedService.toLowerCase()));
+        const matchesBio = n.bio && n.bio.toLowerCase().includes(selectedService.toLowerCase());
+        const matchesServicesBreakdown = n.servicesBreakdown && n.servicesBreakdown.some(s => s.name.toLowerCase().includes(selectedService.toLowerCase()));
+        if (!matchesTitle && !matchesTags && !matchesBio && !matchesServicesBreakdown) return false;
+      }
+
+      // Search text query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesLabel = n.label.toLowerCase().includes(q);
+        const matchesBio = n.bio ? n.bio.toLowerCase().includes(q) : false;
+        const matchesTitle = n.title ? n.title.toLowerCase().includes(q) : false;
+        const matchesLocation = n.location ? n.location.toLowerCase().includes(q) : false;
+        const matchesTags = n.tags ? n.tags.some(t => t.toLowerCase().includes(q)) : false;
+        const matchesHighlights = n.highlights ? n.highlights.some(h => h.toLowerCase().includes(q)) : false;
+        if (!matchesLabel && !matchesBio && !matchesTitle && !matchesLocation && !matchesTags && !matchesHighlights) return false;
+      }
+
+      return true;
     });
+  }, [nodes, selectedCategory, locationFilter, stageFilter, hourlyRateFilter, selectedTechTag, selectedService, searchQuery]);
 
-    setWorkspace({
-      ...workspace,
-      entries: updatedEntries
-    });
+  // Handle Introduction Request
+  const handleRequestIntro = async () => {
+    if (!introTarget) return;
+    const requiredCredits = 25;
+    if (credits < requiredCredits) {
+      alert("Insufficient AI credits. You need at least 25 credits to request an introduction.");
+      return;
+    }
 
-    // Save locally
-    const storageKey = user?.email
-      ? `z961_brain_ws_${user.email.replace(/[^a-z0-9]/gi, "_")}`
-      : "z961_brain_ws_guest";
-    localStorage.setItem(storageKey, JSON.stringify({ ...workspace, entries: updatedEntries }));
+    setIsSubmittingIntro(true);
+    try {
+      const res = await fetch("/api/introductions/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requesterName: "Founder / Ecosystem Member",
+          targetEntityName: introTarget.label,
+          pitchNote: pitchNote || "Interested in exploring synergy and partnership.",
+          creditsDeducted: requiredCredits
+        })
+      });
+      await res.json();
+      deductCredits(requiredCredits);
+
+      setIntroSuccessMsg(`Introduction request dispatched to ${introTarget.label}! 25 credits deducted.`);
+      showToast(`Introduction request dispatched to ${introTarget.label}!`);
+      setTimeout(() => {
+        setIntroTarget(null);
+        setIntroSuccessMsg(null);
+        setPitchNote("");
+      }, 2500);
+    } catch (err) {
+      console.error("Failed to request intro:", err);
+      alert("Failed to submit introduction request. Please try again.");
+    } finally {
+      setIsSubmittingIntro(false);
+    }
   };
 
-  const workspaceTitle = user
-    ? `${user.name} | z961 Intelligence Engine`
-    : "Guest Preview | z961 Intelligence Engine";
+  const handleOpenIntroModal = (target: GraphNode) => {
+    if (!user) {
+      onOpenAuth?.("signup", `Request direct introduction to ${target.label} and unlock verified contact channels`);
+      return;
+    }
+    setIntroTarget(target);
+  };
+
+  const handleResetFilters = () => {
+    setSelectedCategory("ALL");
+    setSelectedService("ALL");
+    setLocationFilter("ALL");
+    setStageFilter("ALL");
+    setHourlyRateFilter("ALL");
+    setSelectedTechTag("ALL");
+    setSearchQuery("");
+  };
+
+  const isFilterActive = selectedCategory !== "ALL" || locationFilter !== "ALL" || selectedService !== "ALL" || hourlyRateFilter !== "ALL" || stageFilter !== "ALL" || selectedTechTag !== "ALL" || searchQuery.trim() !== "";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* ========================================================================= */}
-      {/* 1. TOP CONTROL BAR */}
-      {/* ========================================================================= */}
-      <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-4 py-3 sticky top-0 z-30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-slate-950 flex items-center justify-center font-bold shadow-md shrink-0">
-            <Brain className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm sm:text-base font-bold text-white font-mono tracking-tight">
-                {workspaceTitle}
-              </h1>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
-                PROVISIONED
-              </span>
+    <div id="yellow-pages-directory-container" className="space-y-6">
+      {/* Visitor Preview Mode Banner if !user */}
+      {!user && (
+        <div className="rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 border-2 border-emerald-500/40 p-4 sm:p-5 text-white shadow-md">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white text-sm">Visitor Preview Mode</span>
+                  <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
+                    FREE SIGN-UP REQUIRED
+                  </span>
+                </div>
+                <p className="text-slate-300 text-xs font-sans mt-0.5">
+                  You are previewing public directory listings. <strong>Sign up free</strong> with your name and email to request direct introductions, access verified contacts, and join the 961AI Community Mailing List.
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
-              <span>{user?.affiliation || "Ecosystem Researcher"}</span>
-              <span>•</span>
-              <span className="text-emerald-400 font-bold">
-                {workspace?.entries.length || 0} Grounded Sources Ingested
-              </span>
-              <span>•</span>
-              <span className="text-slate-500">Andrej Karpathy LLM Wiki Architecture</span>
-            </div>
+            <button
+              onClick={() => onOpenAuth?.("signup", "Request founder introductions and view verified directory contacts")}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shrink-0 transition-all shadow-md flex items-center gap-1.5 cursor-pointer font-mono"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Sign Up Free to Access</span>
+            </button>
           </div>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Platform Core Modules Toggle */}
-          <button
-            onClick={() => setShowCoreModules(!showCoreModules)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition-colors cursor-pointer ${
-              showCoreModules
-                ? "bg-emerald-600 text-white border-emerald-500 shadow-sm"
-                : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
-            }`}
-            title="Toggle Platform Core Modules & Quick Access"
-          >
-            <Compass className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden sm:inline">Platform Modules</span>
-          </button>
-
-          {/* WhatsApp Button */}
-          <button
-            onClick={() => setIsWhatsAppModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 text-xs font-mono transition-colors cursor-pointer"
-            title="Ingest via WhatsApp (+961 70 247 961)"
-          >
-            <Phone className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">WhatsApp Ingest</span>
-            <span className="text-[10px] px-1 bg-emerald-500 text-slate-950 rounded font-bold">
-              +961
-            </span>
-          </button>
-
-          {/* Architecture Modal Button */}
-          <button
-            onClick={() => setIsArchModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-mono transition-colors cursor-pointer"
-          >
-            <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden sm:inline">Architecture & Tests</span>
-          </button>
-
-          {/* Add Source CTA */}
-          <button
-            onClick={() => {
-              if (!user) {
-                onOpenAuth?.("signup", "Upload custom intelligence and notes to your Second Brain");
-              } else {
-                setIsAddSourceModalOpen(true);
-              }
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs font-mono transition-all cursor-pointer shadow-sm"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Ingest Source</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Expandable Platform Core Modules & Quick Access Panel */}
-      {showCoreModules && (
-        <div className="p-3 sm:p-4 bg-slate-950/90 border-b border-slate-800 animate-in fade-in slide-in-from-top-2 duration-200">
-          <PlatformCoreModulesBar
-            user={user}
-            onNavigateToModule={onNavigateToModule}
-            onNavigateToDirectory={onNavigateToDirectory}
-            onNavigateToQuestionnaire={() => onNavigateToModule?.(2)}
-            onOpenPricing={onOpenPricing}
-          />
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 2. THREE-PANEL EMBEDDED WORKSPACE CANVAS */}
-      {/* ========================================================================= */}
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden h-[calc(100vh-65px)]">
-        {/* ======================================================================= */}
-        {/* PANEL A (LEFT): SOURCES & CRM DIRECTORY (Cols 1-3, 310px-350px) */}
-        {/* ======================================================================= */}
-        <section aria-label="Knowledge Sources" className="lg:col-span-3 border-r border-slate-800 bg-slate-900/50 flex flex-col h-full overflow-hidden">
-          {/* Panel A Header & Search */}
-          <div className="p-3.5 border-b border-slate-800 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200 font-mono">
-                <BookOpen className="w-4 h-4 text-emerald-400" />
-                <span>Knowledge Base & Sources</span>
+      {/* Top Header Hero Banner & Bottom Navigation */}
+      <div className="rounded-2xl bg-white border-2 border-[#B0CFAD] p-6 md:p-8 shadow-xs space-y-6">
+        {/* Top Header Row: Breadcrumb & Title Context */}
+        <div className="space-y-3">
+          {/* Breadcrumb & Layer Tag */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={onNavigateToHome}
+              className="inline-flex items-center gap-1 text-xs font-bold text-[#2E5A2C] hover:text-[#1E3B1D] hover:underline cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Home</span>
+            </button>
+            <span className="text-slate-400 text-xs">/</span>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#EBF3EA] text-[#2E5A2C] border border-[#75AC73] flex items-center gap-1 font-mono">
+              <Layers className="w-3 h-3 text-[#4D7D4B]" />
+              <span>Layer 3 Yellow Pages Directory</span>
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300 font-mono">
+              {nodes.filter(n => n.type !== "Skill" && n.type !== "Location").length} Verified Entities Indexed
+            </span>
+          </div>
+
+          <div>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-950 tracking-tight">
+              Lebanon AI Yellow Pages Directory
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-3xl leading-relaxed mt-1.5 font-sans">
+              Comprehensive institutional directory of verified Lebanese AI startups, machine learning & software agencies, diaspora researchers, venture capital funds, and incubation hubs with cross-linked wikis and automated synergy routing.
+            </p>
+          </div>
+
+          {/* Quick Ecosystem Metric Badges */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+            <div className="p-2 rounded-xl bg-[#F6FAF5] border border-[#D7E7D6] flex items-center gap-2">
+              <Laptop className="w-4 h-4 text-emerald-700 shrink-0" />
+              <div className="truncate">
+                <span className="text-[10px] text-slate-500 font-mono block">AI & Dev Agencies</span>
+                <span className="text-xs font-bold text-slate-900 font-mono">{agencyNodesCount} Verified</span>
               </div>
+            </div>
+            <div className="p-2 rounded-xl bg-[#F6FAF5] border border-[#D7E7D6] flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-indigo-700 shrink-0" />
+              <div className="truncate">
+                <span className="text-[10px] text-slate-500 font-mono block">Startups & Labs</span>
+                <span className="text-xs font-bold text-slate-900 font-mono">{startupNodesCount} Scaled</span>
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-[#F6FAF5] border border-[#D7E7D6] flex items-center gap-2">
+              <Users className="w-4 h-4 text-amber-700 shrink-0" />
+              <div className="truncate">
+                <span className="text-[10px] text-slate-500 font-mono block">Gurus & Talent</span>
+                <span className="text-xs font-bold text-slate-900 font-mono">{nodes.filter(n => n.type === "Guru").length} Experts</span>
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-[#F6FAF5] border border-[#D7E7D6] flex items-center gap-2">
+              <Briefcase className="w-4 h-4 text-rose-700 shrink-0" />
+              <div className="truncate">
+                <span className="text-[10px] text-slate-500 font-mono block">VCs & Hubs</span>
+                <span className="text-xs font-bold text-slate-900 font-mono">{nodes.filter(n => n.type === "Investor" || n.type === "Hub").length} Capital</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="flex items-center gap-3 bg-[#F6FAF5] border-2 border-[#B0CFAD] rounded-xl p-3 shadow-xs">
+          <Search className="w-5 h-5 text-[#2E5A2C] ml-1.5 shrink-0" />
+          <input
+            type="text"
+            placeholder="Search by entity name, service, technology tag (e.g. LLM, Computer Vision, FinTech), location, or bio..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-transparent text-xs sm:text-sm text-slate-900 font-medium placeholder-slate-500 focus:outline-none"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="text-xs text-slate-700 hover:text-black px-2.5 py-1 bg-white border border-[#B0CFAD] rounded-md font-bold shrink-0 cursor-pointer"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Buttons Placed at the Bottom of the Section */}
+        <div className="pt-3 border-t border-[#D7E7D6] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="text-[11px] font-mono font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-[#2E5A2C]" />
+            <span>Quick Directory Actions</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2.5">
+            {/* 1. Back to Home */}
+            <button
+              id="dir-btn-back-home"
+              onClick={onNavigateToHome}
+              className="px-4 py-2.5 rounded-xl bg-white hover:bg-[#EBF3EA] text-[#2E5A2C] font-bold text-xs sm:text-sm border-2 border-[#B0CFAD] flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4 text-[#2E5A2C]" />
+              <span>Back to Home</span>
+            </button>
+
+            {/* 2. Join / Submit Entity */}
+            {onNavigateToQuestionnaire && (
               <button
-                onClick={handleToggleSelectAll}
-                className="text-[10px] font-mono text-emerald-400 hover:underline cursor-pointer"
+                id="dir-btn-join-entity"
+                onClick={onNavigateToQuestionnaire}
+                style={{ color: "#ffffff" }}
+                className="px-4 py-2.5 rounded-xl bg-[#2E5A2C] hover:bg-[#1E3B1D] text-white !text-white font-bold text-xs sm:text-sm shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer border-2 border-[#1E3B1D]"
               >
-                {selectedEntryIds.length === filteredEntries.length ? "Deselect All" : "Select All"}
+                <Sparkles className="w-4 h-4 !text-white text-white" style={{ color: "#ffffff" }} />
+                <span style={{ color: "#ffffff" }} className="!text-white text-white font-bold">Join / Submit Entity</span>
               </button>
-            </div>
+            )}
 
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search sources, tags, Wikilinks..."
-                className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
-              />
-            </div>
+            {/* 3. Provider Marketplace */}
+            {onNavigateToMarketplace && (
+              <button
+                id="dir-btn-marketplace"
+                onClick={onNavigateToMarketplace}
+                className="px-4 py-2.5 rounded-xl bg-white hover:bg-[#EBF3EA] text-slate-900 font-bold text-xs sm:text-sm border-2 border-[#D7E7D6] hover:border-[#B0CFAD] flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
+              >
+                <Laptop className="w-4 h-4 text-[#4D7D4B]" />
+                <span>Provider Marketplace</span>
+              </button>
+            )}
 
-            {/* Category Filter Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px] font-mono no-scrollbar">
-              {(
-                [
-                  { id: "all", label: "All" },
-                  { id: "research", label: "Research" },
-                  { id: "contact", label: "CRM" },
-                  { id: "note", label: "Notes" },
-                  { id: "followup", label: "Tasks" }
-                ] as const
-              ).map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-2 py-1 rounded-md transition-colors cursor-pointer shrink-0 ${
-                    selectedCategory === cat.id
-                      ? "bg-emerald-500 text-slate-950 font-bold"
-                      : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
+            {/* 4. Knowledge Graph */}
+            {onOpenGraphView && (
+              <button
+                id="dir-btn-graph"
+                onClick={onOpenGraphView}
+                className="px-4 py-2.5 rounded-xl bg-white hover:bg-[#EBF3EA] text-slate-900 font-bold text-xs sm:text-sm border-2 border-[#D7E7D6] hover:border-[#B0CFAD] flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
+              >
+                <Network className="w-4 h-4 text-[#4D7D4B]" />
+                <span>Knowledge Graph</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Layout: Sidebar Filters + Directory Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+        {/* Left Filter Sidebar */}
+        <div className="lg:col-span-1 bg-white border-2 border-[#D7E7D6] rounded-2xl p-5 space-y-6 shadow-xs">
+          <div className="flex items-center justify-between border-b border-[#EBF3EA] pb-3">
+            <h2 className="text-sm font-black text-[#000000] flex items-center gap-2">
+              <Filter className="w-4 h-4 text-[#4D7D4B]" />
+              <span>Taxonomy Filters</span>
+            </h2>
+            {isFilterActive && (
+              <button
+                onClick={handleResetFilters}
+                className="text-xs text-[#2E5A2C] hover:text-black transition-colors font-bold flex items-center gap-1"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
+
+          {/* Category Filter */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-[#000000] font-mono">
+              Primary Stakeholder Type
+            </label>
+            <div className="space-y-1">
+              {categories.map((cat) => {
+                const Icon = cat.icon;
+                const isSelected = selectedCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                      isSelected
+                        ? "bg-[#4D7D4B] text-white shadow-xs font-bold border border-[#3D633C]"
+                        : "text-[#000000] bg-[#F6FAF5] hover:bg-[#EBF3EA] border border-[#D7E7D6] font-semibold"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-white" : "text-[#4D7D4B]"}`} />
+                      <span>{cat.label}</span>
+                    </div>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                      isSelected ? "bg-[#3D633C] text-white" : "bg-[#EBF3EA] text-[#2E5A2C] border border-[#B0CFAD]"
+                    }`}>
+                      {cat.count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Sources List */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {isLoadingWorkspace ? (
-              <div className="p-8 text-center text-xs text-slate-500 font-mono space-y-2">
-                <Brain className="w-6 h-6 text-emerald-500 animate-pulse mx-auto" />
-                <p>Mounting Sovereign Second Brain Vault...</p>
-              </div>
-            ) : filteredEntries.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500 font-mono border border-dashed border-slate-800 rounded-xl space-y-2">
-                <FileText className="w-6 h-6 text-slate-600 mx-auto" />
-                <p>No documents found matching current filter.</p>
-                <button
-                  onClick={() => setIsAddSourceModalOpen(true)}
-                  className="text-emerald-400 hover:underline text-xs"
-                >
-                  + Add first document
-                </button>
-              </div>
-            ) : (
-              filteredEntries.map((entry) => {
-                const isSelected = selectedEntryIds.includes(entry.id);
-                const isViewing = activeViewingEntryId === entry.id;
+          {/* Location / Diaspora Filter */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-[#000000] font-mono">
+              Geography & Reach
+            </label>
+            <div className="grid grid-cols-2 gap-1.5 bg-[#F6FAF5] p-1 rounded-xl border border-[#D7E7D6] text-[11px]">
+              <button
+                onClick={() => setLocationFilter("ALL")}
+                className={`py-1.5 px-2 rounded-lg font-bold transition-all ${
+                  locationFilter === "ALL" ? "bg-[#4D7D4B] text-white shadow-xs" : "text-[#000000] hover:text-[#2E5A2C]"
+                }`}
+              >
+                All Regions
+              </button>
+              <button
+                onClick={() => setLocationFilter("onshore")}
+                className={`py-1.5 px-2 rounded-lg font-bold transition-all flex items-center justify-center gap-1 ${
+                  locationFilter === "onshore" ? "bg-[#4D7D4B] text-white shadow-xs" : "text-[#000000] hover:text-[#2E5A2C]"
+                }`}
+              >
+                <span>🇱🇧 Onshore</span>
+              </button>
+              <button
+                onClick={() => setLocationFilter("diaspora")}
+                className={`py-1.5 px-2 rounded-lg font-bold transition-all flex items-center justify-center gap-1 ${
+                  locationFilter === "diaspora" ? "bg-[#4D7D4B] text-white shadow-xs" : "text-[#000000] hover:text-[#2E5A2C]"
+                }`}
+              >
+                <span>🌍 Diaspora</span>
+              </button>
+              <button
+                onClick={() => setLocationFilter("servesLebanon")}
+                className={`py-1.5 px-2 rounded-lg font-bold transition-all flex items-center justify-center gap-1 ${
+                  locationFilter === "servesLebanon" ? "bg-[#4D7D4B] text-white shadow-xs" : "text-[#000000] hover:text-[#2E5A2C]"
+                }`}
+              >
+                <span>🤝 Serves Lebanon</span>
+              </button>
+            </div>
+          </div>
 
-                const categoryBadgeColor =
-                  entry.category === "research"
-                    ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                    : entry.category === "contact"
-                    ? "bg-purple-500/20 text-purple-400 border-purple-500/30"
-                    : entry.category === "followup"
-                    ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                    : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+          {/* Sub-Service Taxonomy Filter */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-[#000000] font-mono">
+              Service / Core Domain
+            </label>
+            <select
+              value={selectedService}
+              onChange={(e) => setSelectedService(e.target.value)}
+              className="w-full bg-[#F6FAF5] border border-[#D7E7D6] focus:border-[#4D7D4B] rounded-xl px-3 py-2 text-xs text-[#000000] font-semibold focus:outline-none"
+            >
+              {subServices.map((srv) => (
+                <option key={srv} value={srv} className="bg-white text-black">
+                  {srv}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Hourly Rate Filter */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-[#000000] font-mono">
+              Hourly Rate Filter
+            </label>
+            <select
+              value={hourlyRateFilter}
+              onChange={(e) => setHourlyRateFilter(e.target.value)}
+              className="w-full bg-[#F6FAF5] border border-[#D7E7D6] focus:border-[#4D7D4B] rounded-xl px-3 py-2 text-xs text-[#000000] font-semibold focus:outline-none"
+            >
+              {hourlyRates.map((hr) => (
+                <option key={hr} value={hr} className="bg-white text-black">
+                  {hr === "ALL" ? "All Hourly Rates" : hr}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Funding Stage / Project Size Filter */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-[#000000] font-mono">
+              Stage / Project Size
+            </label>
+            <select
+              value={stageFilter}
+              onChange={(e) => setStageFilter(e.target.value)}
+              className="w-full bg-[#F6FAF5] border border-[#D7E7D6] focus:border-[#4D7D4B] rounded-xl px-3 py-2 text-xs text-[#000000] font-semibold focus:outline-none"
+            >
+              {stages.map((stg) => (
+                <option key={stg} value={stg} className="bg-white text-black">
+                  {stg === "ALL" ? "All Project Sizes / Stages" : stg}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Popular Tech Tags */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-[#000000] font-mono">
+              Popular Tags
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {allTechTags.map((tag) => {
+                const isActive = selectedTechTag === tag;
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => setSelectedTechTag(isActive ? "ALL" : tag)}
+                    className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                      isActive
+                        ? "bg-[#4D7D4B] text-white shadow-xs"
+                        : "bg-[#F6FAF5] text-[#000000] border border-[#D7E7D6] hover:bg-[#EBF3EA]"
+                    }`}
+                  >
+                    #{tag}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Entity Listing */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Results Bar */}
+          <div className="flex items-center justify-between bg-white border-2 border-[#D7E7D6] rounded-xl px-4 py-2.5 text-xs text-[#000000] font-mono">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[#000000] text-sm">{filteredNodes.length}</span>
+              <span className="font-medium text-slate-700">entities indexed in directory</span>
+              {isFilterActive && (
+                <span className="px-2 py-0.5 rounded bg-[#EBF3EA] text-[#2E5A2C] border border-[#75AC73] text-[10px] font-bold">
+                  Filtered Active
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-[#2E5A2C] font-bold bg-[#EBF3EA] px-2 py-0.5 rounded border border-[#B0CFAD]">
+                Intro Rate: 25 Credits
+              </span>
+            </div>
+          </div>
+
+          {/* Entity Cards Grid */}
+          {filteredNodes.length === 0 ? (
+            <div className="rounded-2xl border-2 border-[#D7E7D6] bg-white p-12 text-center space-y-3 shadow-xs">
+              <div className="w-12 h-12 rounded-full bg-[#F6FAF5] border border-[#D7E7D6] flex items-center justify-center mx-auto text-slate-500">
+                <Search className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900">No entities found</h3>
+              <p className="text-xs text-slate-600 max-w-md mx-auto">
+                No verified nodes match your current search and filter combination. Try resetting your filters or submit a new entity.
+              </p>
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <button
+                  onClick={handleResetFilters}
+                  className="px-4 py-2 rounded-xl bg-white border border-[#D7E7D6] text-slate-800 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+                >
+                  Reset All Filters
+                </button>
+                {onNavigateToQuestionnaire && (
+                  <button
+                    onClick={onNavigateToQuestionnaire}
+                    className="px-4 py-2 rounded-xl bg-[#4D7D4B] hover:bg-[#3D633C] text-white text-xs font-bold transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>List Entity / Ingest</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredNodes.map((node) => {
+                const isAgency = node.rating !== undefined || node.servicesBreakdown !== undefined || node.minProjectSize !== undefined;
+                const isStartup = node.type === "Startup" && !isAgency;
+                const isGuru = node.type === "Guru";
+                const isInvestor = node.type === "Investor";
+                const isHub = node.type === "Hub";
 
                 return (
                   <div
-                    key={entry.id}
-                    onClick={() => {
-                      setActiveViewingEntryId(entry.id);
-                      setActiveCenterView("document");
-                    }}
-                    className={`p-2.5 rounded-xl border transition-all cursor-pointer space-y-1.5 ${
-                      isViewing
-                        ? "bg-slate-800/90 border-emerald-500/60 shadow-xs"
-                        : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
-                    }`}
+                    key={node.id}
+                    className="group rounded-2xl bg-white hover:bg-[#F6FAF5] border-2 border-[#D7E7D6] hover:border-[#75AC73] p-5 transition-all shadow-xs flex flex-col justify-between"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2 flex-1 min-w-0">
-                        {/* Checkbox for Grounded RAG selection */}
-                        <button
-                          type="button"
-                          onClick={(e) => toggleEntrySelection(entry.id, e)}
-                          className="mt-0.5 text-slate-400 hover:text-emerald-400 cursor-pointer"
-                          title="Include in AI Copilot Grounding Context"
-                        >
-                          {isSelected ? (
-                            <CheckSquare className="w-4 h-4 text-emerald-400" />
-                          ) : (
-                            <Square className="w-4 h-4 text-slate-600" />
+                    <div className="space-y-3">
+                      {/* Top Badges */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            isAgency ? "bg-emerald-50 text-emerald-900 border border-emerald-400" :
+                            isStartup ? "bg-indigo-50 text-indigo-900 border border-indigo-300" :
+                            isGuru ? "bg-[#EBF3EA] text-[#2E5A2C] border border-[#75AC73]" :
+                            isInvestor ? "bg-amber-50 text-amber-900 border border-amber-400" :
+                            "bg-teal-50 text-teal-900 border border-teal-300"
+                          }`}>
+                            {isAgency ? "Software & AI Agency" : node.type}
+                          </span>
+
+                          {node.premierVerified && (
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-400">
+                              <Award className="w-3 h-3 text-amber-600" />
+                              <span>Premier Verified</span>
+                            </span>
                           )}
-                        </button>
-                        <div className="min-w-0 flex-1">
-                          <h2 className="text-xs font-bold text-slate-200 truncate hover:text-white">
-                            {entry.title}
-                          </h2>
-                          <p className="text-[10px] text-slate-400 line-clamp-1">
-                            {entry.contentPayload.text.slice(0, 80)}
-                          </p>
+
+                          {!node.premierVerified && node.verified && (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[#EBF3EA] text-[#2E5A2C] border border-[#75AC73]">
+                              <ShieldCheck className="w-3 h-3 text-[#4D7D4B]" />
+                              <span>Verified</span>
+                            </span>
+                          )}
+
+                          {node.servesLebanon || node.location?.toLowerCase().includes("serves lebanon") ? (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                              <span>🇱🇧 Serves Lebanon</span>
+                            </span>
+                          ) : node.isDiaspora ? (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-300">
+                              <Globe className="w-3 h-3" />
+                              <span>Diaspora</span>
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-300">
+                              <span>🇱🇧 Onshore Node</span>
+                            </span>
+                          )}
                         </div>
+
+                        {/* Rating or Stage Tag */}
+                        {node.rating !== undefined ? (
+                          <div className="flex items-center gap-1 bg-[#F6FAF5] border border-[#B0CFAD] px-2 py-0.5 rounded-lg text-black font-black text-xs">
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                            <span>{node.rating.toFixed(1)}</span>
+                            {node.reviewCount !== undefined && (
+                              <span className="text-[10px] text-[#000000] font-semibold">({node.reviewCount})</span>
+                            )}
+                          </div>
+                        ) : node.stage ? (
+                          <span className="text-[11px] font-mono text-[#000000] font-bold bg-white px-2 py-0.5 rounded-md border border-[#D7E7D6]">
+                            {node.stage}
+                          </span>
+                        ) : null}
                       </div>
-                    </div>
 
-                    <div className="flex items-center justify-between text-[10px] font-mono pt-1">
-                      <span className={`px-1.5 py-0.2 rounded border uppercase font-bold text-[9px] ${categoryBadgeColor}`}>
-                        {entry.category}
-                      </span>
-                      <span className="text-slate-500">
-                        {entry.sourceType === "whatsapp"
-                          ? "WhatsApp z24seven"
-                          : entry.sourceType === "web_cta"
-                          ? "Web CTA"
-                          : "Vault Asset"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                      {/* Title & Headline */}
+                      <div>
+                        <button
+                          onClick={() => onSelectNode(node)}
+                          className="text-left group-hover:text-[#2E5A2C] transition-colors"
+                        >
+                          <h3 className="text-base font-black text-[#000000] flex items-center gap-1.5">
+                            <span>{node.label}</span>
+                            <ArrowUpRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-[#4D7D4B]" />
+                          </h3>
+                        </button>
+                        {node.title && (
+                          <p className="text-xs font-bold text-[#2E5A2C] mt-0.5 line-clamp-1">
+                            {node.title}
+                          </p>
+                        )}
+                      </div>
 
-          {/* Panel A Footer Status */}
-          <div className="p-3 border-t border-slate-800 bg-slate-950/80 text-[10px] font-mono text-slate-400 flex items-center justify-between">
-            <span>
-              <strong>{selectedEntryIds.length}</strong> of {workspace?.entries.length || 0} active in AI context
-            </span>
-            <span className="text-emerald-400">Zero Hallucination</span>
-          </div>
-        </section>
+                      {/* Agency Specific Metrics Row */}
+                      {isAgency && (
+                        <div className="grid grid-cols-3 gap-2 py-2 px-2.5 bg-[#F6FAF5] rounded-xl border border-[#D7E7D6] text-[11px]">
+                          <div>
+                            <span className="text-[10px] text-[#000000] block uppercase font-mono font-semibold">Min Project</span>
+                            <span className="font-bold text-[#000000]">{node.minProjectSize || "$1,000+"}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-[#000000] block uppercase font-mono font-semibold">Hourly Rate</span>
+                            <span className="font-bold text-[#000000]">{node.hourlyRate || "Undisclosed"}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-[#000000] block uppercase font-mono font-semibold">Team Size</span>
+                            <span className="font-bold text-[#000000]">{node.teamSize || "50 - 249"}</span>
+                          </div>
+                        </div>
+                      )}
 
-        {/* ======================================================================= */}
-        {/* PANEL B (CENTER): DUAL-MODE CANVAS (CO-PILOT CHAT / MARKDOWN READER) (Cols 4-8) */}
-        {/* ======================================================================= */}
-        <section aria-label="Synthesis Canvas" className="lg:col-span-5 border-r border-slate-800 bg-slate-950 flex flex-col h-full overflow-hidden">
-          {/* Panel B Header Tabs */}
-          <div className="p-3 border-b border-slate-800 bg-slate-900/60 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setActiveCenterView("chat")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  activeCenterView === "chat"
-                    ? "bg-emerald-600 text-slate-950 shadow-xs"
-                    : "bg-slate-800 text-slate-400 hover:text-white"
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Grounded AI Copilot</span>
-              </button>
-              <button
-                onClick={() => setActiveCenterView("document")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  activeCenterView === "document"
-                    ? "bg-emerald-600 text-slate-950 shadow-xs"
-                    : "bg-slate-800 text-slate-400 hover:text-white"
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Document / Dossier Reader</span>
-              </button>
-            </div>
+                      {/* Location & Affiliation */}
+                      <div className="flex items-center gap-3 text-xs text-[#000000] font-medium">
+                        {node.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-[#4D7D4B] shrink-0" />
+                            <span className="truncate">{node.location}</span>
+                          </span>
+                        )}
+                        {node.connectionsCount && (
+                          <span className="flex items-center gap-1 font-mono text-[11px] text-[#000000] font-semibold">
+                            <span>{node.connectionsCount} links</span>
+                          </span>
+                        )}
+                      </div>
 
-            {activeCenterView === "document" && activeEntry && (
-              <button
-                onClick={() => {
-                  setActiveCenterView("chat");
-                  handleSendQuery(`Explain the key strategic takeaways and regulatory implications of [[${activeEntry.title}]]`);
-                }}
-                className="text-[11px] font-mono text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <span>Ask AI about this</span>
-                <ArrowRight className="w-3 h-3" />
-              </button>
-            )}
-          </div>
+                      {/* Bio Summary */}
+                      {node.bio && (
+                        <p className="text-xs text-[#000000] font-medium line-clamp-2 leading-relaxed">
+                          {node.bio}
+                        </p>
+                      )}
 
-          {/* VIEW 1: GROUNDED AI COPILOT CHAT */}
-          {activeCenterView === "chat" && (
-            <div className="flex-1 flex flex-col h-full overflow-hidden">
-              {/* Messages Scroll Area */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {chatMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex flex-col space-y-1.5 ${
-                      msg.sender === "user" ? "items-end" : "items-start"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500 px-1">
-                      <span>{msg.sender === "user" ? user?.name || "You" : "z961 Copilot (Grounded RAG)"}</span>
-                      <span>•</span>
-                      <span>{msg.timestamp}</span>
-                    </div>
-
-                    <div
-                      className={`p-3.5 rounded-2xl text-xs max-w-[90%] leading-relaxed ${
-                        msg.sender === "user"
-                          ? "bg-emerald-600 text-slate-950 font-medium"
-                          : "bg-slate-900 border border-slate-800 text-slate-200 font-sans shadow-md"
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap">{msg.text}</div>
-
-                      {/* Grounded Citations & Sources Pill Bar */}
-                      {msg.citations && msg.citations.length > 0 && (
-                        <div className="mt-3 pt-2 border-t border-slate-800/80 space-y-1.5 font-mono text-[10px]">
-                          <div className="flex items-center justify-between text-emerald-400 font-bold">
-                            <span className="flex items-center gap-1">
-                              <ShieldCheck className="w-3 h-3" />
-                              <span>Verified Citations ({msg.citations.length})</span>
-                            </span>
-                            <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded text-[9px]">
-                              {msg.groundingConfidence || 95}% Grounded
-                            </span>
+                      {/* Services Breakdown Bar (if present) */}
+                      {node.servicesBreakdown && node.servicesBreakdown.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex items-center justify-between text-[10px] text-[#000000] font-mono font-bold">
+                            <span>Services Breakdown</span>
+                            <span>{node.servicesBreakdown[0]?.percentage}% {node.servicesBreakdown[0]?.name}</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
-                            {msg.citations.map((cite, idx) => (
-                              <button
+                            {node.servicesBreakdown.map((s, idx) => (
+                              <span
                                 key={idx}
-                                onClick={() => {
-                                  // Jump to source document if match found
-                                  const match = workspace?.entries.find((e) =>
-                                    cite.toLowerCase().includes(e.title.toLowerCase())
-                                  );
-                                  if (match) {
-                                    setActiveViewingEntryId(match.id);
-                                    setActiveCenterView("document");
-                                  }
-                                }}
-                                className="px-2 py-0.5 rounded bg-slate-950 border border-slate-700 text-slate-300 hover:text-emerald-300 hover:border-emerald-500 text-[10px] flex items-center gap-1 cursor-pointer"
+                                className="px-2 py-0.5 rounded-md bg-[#EBF3EA] text-[#2E5A2C] border border-[#B0CFAD] text-[10px] font-bold"
                               >
-                                <span>[{idx + 1}]</span>
-                                <span>{cite}</span>
-                              </button>
+                                {s.percentage}% {s.name}
+                              </span>
                             ))}
                           </div>
                         </div>
                       )}
+
+                      {/* Highlights Badges (if present) */}
+                      {node.highlights && node.highlights.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {node.highlights.map((hl, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-300 text-[10px] font-bold"
+                            >
+                              ✓ {hl}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Cross-linked Tags (Karpathy [[Wikilinks]]) */}
+                      {node.tags && node.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {node.tags.slice(0, 6).map((t) => (
+                            <span
+                              key={t}
+                              className="px-2 py-0.5 rounded-md bg-white text-[#000000] border border-[#D7E7D6] text-[10px] font-mono font-bold hover:border-[#75AC73] hover:text-[#2E5A2C] transition-colors"
+                            >
+                              [[{t}]]
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bottom Action Footer */}
+                    <div className="mt-4 pt-3 border-t border-[#D7E7D6] flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => onSelectNode(node)}
+                        className="text-xs font-bold text-[#000000] hover:text-[#2E5A2C] flex items-center gap-1 py-1.5 px-3 rounded-lg bg-white border border-[#D7E7D6] hover:bg-[#EBF3EA] transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-[#4D7D4B]" />
+                        <span>Inspect Wiki</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenIntroModal(node)}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#4D7D4B] hover:bg-[#3D633C] text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all"
+                      >
+                        <Send className="w-3 h-3" />
+                        <span>{isAgency ? "Contact & Request Intro" : "Request Intro (25 CR)"}</span>
+                      </button>
                     </div>
                   </div>
-                ))}
-
-                {isSynthesizing && (
-                  <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-emerald-400 max-w-[320px] animate-pulse">
-                    <Brain className="w-4 h-4 animate-spin" />
-                    <span>Executing grounded synthesis across {selectedEntryIds.length} sources...</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Quick Prompt Suggestions */}
-              <div className="px-4 py-2 border-t border-slate-800/60 bg-slate-900/30 flex items-center gap-1.5 overflow-x-auto text-[10px] font-mono no-scrollbar">
-                <span className="text-slate-500 shrink-0">Quick Queries:</span>
-                {[
-                  "BDL Circular 165 compliance",
-                  "Cedar AI Syndicate ticket sizes",
-                  "Delaware Flip legal steps",
-                  "List all urgent tasks"
-                ].map((prompt, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSendQuery(prompt)}
-                    className="px-2 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-emerald-400 border border-slate-800 shrink-0 cursor-pointer"
-                  >
-                    {prompt}
-                  </button>
-                ))}
-              </div>
-
-              {/* Query Input Bar */}
-              <div className="p-3 border-t border-slate-800 bg-slate-900/80">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSendQuery();
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <input
-                    type="text"
-                    value={queryInput}
-                    onChange={(e) => setQueryInput(e.target.value)}
-                    placeholder={`Ask zero-hallucination copilot across ${selectedEntryIds.length} selected sources...`}
-                    className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isSynthesizing || !queryInput.trim()}
-                    className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 font-mono shadow-sm"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Ask Copilot</span>
-                  </button>
-                </form>
-              </div>
+                );
+              })}
             </div>
           )}
+        </div>
+      </div>
 
-          {/* VIEW 2: DOCUMENT / DOSSIER MARKDOWN READER */}
-          {activeCenterView === "document" && (
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              {activeEntry ? (
-                <div className="space-y-4 max-w-3xl">
-                  {/* Document Meta Header */}
-                  <div className="space-y-2 border-b border-slate-800 pb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono uppercase font-bold">
-                        {activeEntry.category}
-                      </span>
-                      <span className="text-[11px] font-mono text-slate-500">
-                        Ingested: {new Date(activeEntry.timestamp).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <h2 className="text-lg font-bold text-white tracking-tight">
-                      {activeEntry.title}
-                    </h2>
-
-                    {/* Tags & Wikilinks */}
-                    {activeEntry.contentPayload.tags && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {activeEntry.contentPayload.tags.map((tag, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 text-[10px] font-mono"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* CRM Contact Details Card (if category === 'contact') */}
-                  {activeEntry.category === "contact" && activeEntry.contentPayload.contactDetails && (
-                    <div className="p-4 rounded-xl bg-slate-900 border border-purple-500/40 space-y-2 text-xs font-mono">
-                      <div className="text-purple-300 font-bold uppercase text-[11px]">
-                        CRM Profile Record
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-slate-300">
-                        <div>Name: <strong className="text-white">{activeEntry.contentPayload.contactDetails.name}</strong></div>
-                        <div>Role: <strong className="text-white">{activeEntry.contentPayload.contactDetails.role}</strong></div>
-                        <div>Organization: <strong className="text-white">{activeEntry.contentPayload.contactDetails.organization}</strong></div>
-                        <div>Email: <strong className="text-emerald-400">{activeEntry.contentPayload.contactDetails.email}</strong></div>
-                        {activeEntry.contentPayload.contactDetails.ticketSize && (
-                          <div>Ticket Size: <strong className="text-amber-400">{activeEntry.contentPayload.contactDetails.ticketSize}</strong></div>
-                        )}
-                        {activeEntry.contentPayload.contactDetails.location && (
-                          <div>Location: <strong className="text-slate-300">{activeEntry.contentPayload.contactDetails.location}</strong></div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Markdown Content Body */}
-                  <div className="prose prose-invert prose-xs max-w-none space-y-3 text-slate-300 text-xs leading-relaxed font-sans">
-                    <div className="whitespace-pre-wrap">
-                      {activeEntry.contentPayload.text}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-8 text-center text-xs text-slate-500 font-mono">
-                  Select a document from Panel A to view its markdown contents.
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-
-        {/* ======================================================================= */}
-        {/* PANEL C (RIGHT): STUDIO & ACTION MATRIX (Cols 9-12, 340px-380px) */}
-        {/* ======================================================================= */}
-        <section aria-label="Action Matrix" className="lg:col-span-4 bg-slate-900/40 flex flex-col h-full overflow-hidden">
-          {/* SUBPANEL 1: GOOGLE NOTEBOOKLM AUDIO STUDIO */}
-          <div className="p-4 border-b border-slate-800 space-y-3 bg-slate-900/70">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
-                  <Headphones className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-white font-mono">
-                    2-Host Audio Deep Dive
-                  </h3>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    NotebookLM AI Architecture
-                  </span>
-                </div>
+      {/* Introduction Request Modal */}
+      {introTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border-2 border-[#B0CFAD] rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#EBF3EA] text-[#4D7D4B] border border-[#B0CFAD]">
+                  Direct Syndicate Introduction
+                </span>
+                <h3 className="text-lg font-bold text-slate-900 mt-1">
+                  Request Introduction to {introTarget.label}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {introTarget.title || introTarget.location}
+                </p>
               </div>
-
               <button
-                onClick={handleGenerateAudio}
-                disabled={isGeneratingAudio}
-                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] font-mono flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                onClick={() => setIntroTarget(null)}
+                className="text-slate-400 hover:text-slate-800 p-1 text-sm font-bold"
               >
-                <Sparkles className="w-3 h-3 text-amber-300" />
-                <span>{isGeneratingAudio ? "Synthesizing..." : "Generate Audio"}</span>
+                ✕
               </button>
             </div>
 
-            {/* Audio Player Box */}
-            {audioOverview ? (
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white font-mono truncate">
-                    {audioOverview.title}
-                  </span>
-                  <span className="text-[10px] font-mono text-indigo-400">
-                    {audioOverview.duration}
-                  </span>
-                </div>
-
-                {/* Simulated Audio Waveform Bar */}
-                <div className="flex items-center gap-1 h-6 bg-slate-900/90 rounded-lg px-2 py-1">
-                  {[40, 75, 55, 90, 30, 85, 60, 95, 50, 70, 45, 80, 65, 90, 35, 75].map((h, i) => (
-                    <div
-                      key={i}
-                      className={`flex-1 rounded-full transition-all duration-300 ${
-                        isPlayingAudio
-                          ? i % 2 === 0
-                            ? "bg-indigo-400"
-                            : "bg-emerald-400"
-                          : "bg-slate-700"
-                      }`}
-                      style={{ height: isPlayingAudio ? `${(h * ((i + currentDialogueIndex) % 3 + 1)) / 3}%` : "30%" }}
-                    />
-                  ))}
-                </div>
-
-                {/* Current Dialogue Quote */}
-                {audioOverview.dialogue[currentDialogueIndex] && (
-                  <div className="p-2 rounded-lg bg-slate-900 border border-slate-800/80 text-[11px] font-sans">
-                    <span className="font-bold text-indigo-300 block text-[10px] font-mono">
-                      Host {audioOverview.dialogue[currentDialogueIndex].speaker}:
-                    </span>
-                    <p className="text-slate-200 italic line-clamp-2">
-                      "{audioOverview.dialogue[currentDialogueIndex].text}"
-                    </p>
-                  </div>
-                )}
-
-                {/* Play / Pause Control */}
-                <div className="flex items-center justify-between pt-1">
-                  <button
-                    onClick={() => setIsPlayingAudio(!isPlayingAudio)}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-bold text-xs font-mono cursor-pointer"
-                  >
-                    {isPlayingAudio ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                    <span>{isPlayingAudio ? "Pause Deep Dive" : "Play Deep Dive"}</span>
-                  </button>
-                  <span className="text-[10px] font-mono text-slate-500">
-                    Clip {currentDialogueIndex + 1} of {audioOverview.dialogue.length}
-                  </span>
-                </div>
+            {introSuccessMsg ? (
+              <div className="p-4 rounded-xl bg-[#EBF3EA] border border-[#B0CFAD] text-[#4D7D4B] text-sm flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-[#5A8D58] shrink-0" />
+                <span>{introSuccessMsg}</span>
               </div>
             ) : (
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-center text-[11px] font-mono text-slate-500">
-                Click "Generate Audio" to synthesize a 2-host conversational podcast analyzing your active sources.
-              </div>
-            )}
-          </div>
-
-          {/* SUBPANEL 2: ACTIONABLE FOLLOW-UP TASK MATRIX */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ListTodo className="w-4 h-4 text-amber-400" />
-                <h3 className="text-xs font-bold text-white font-mono">
-                  Actionable Follow-up Matrix
-                </h3>
-              </div>
-              <span className="text-[10px] font-mono text-slate-400">
-                {followUpEntries.filter((f) => f.contentPayload.followupDetails?.completed).length}/
-                {followUpEntries.length} Done
-              </span>
-            </div>
-
-            {/* Inline Quick Add Task */}
-            <form onSubmit={handleAddQuickTask} className="space-y-1.5">
-              <input
-                type="text"
-                value={newFollowupTask}
-                onChange={(e) => setNewFollowupTask(e.target.value)}
-                placeholder="Add actionable follow-up task..."
-                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-amber-500 font-mono"
-              />
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 text-[10px] font-mono">
-                  {(["urgent", "high", "normal"] as const).map((p) => (
-                    <button
-                      type="button"
-                      key={p}
-                      onClick={() => setNewFollowupPriority(p)}
-                      className={`px-1.5 py-0.5 rounded uppercase font-bold cursor-pointer ${
-                        newFollowupPriority === p
-                          ? p === "urgent"
-                            ? "bg-rose-500 text-white"
-                            : p === "high"
-                            ? "bg-amber-500 text-slate-950"
-                            : "bg-emerald-500 text-slate-950"
-                          : "text-slate-500 hover:text-slate-300"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
+              <>
+                <div className="p-3 rounded-xl bg-[#FAFCFA] border border-[#D7E7D6] text-xs space-y-1 font-mono">
+                  <div className="flex items-center justify-between text-slate-700 font-medium">
+                    <span>Introduction Protocol:</span>
+                    <span className="text-[#4D7D4B] font-bold">Concierge Warm Forwarding</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span>Your Balance:</span>
+                    <span className="font-mono text-amber-700 font-bold">{credits} AI Credits</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span>Cost:</span>
+                    <span className="font-mono text-rose-600 font-bold">-25 Credits</span>
+                  </div>
                 </div>
-                <button
-                  type="submit"
-                  disabled={!newFollowupTask.trim()}
-                  className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] font-mono cursor-pointer disabled:opacity-50"
-                >
-                  + Add Item
-                </button>
-              </div>
-            </form>
 
-            {/* Task Items List */}
-            <div className="space-y-2 pt-1">
-              {followUpEntries.length === 0 ? (
-                <div className="p-4 text-center text-[11px] font-mono text-slate-500 border border-dashed border-slate-800 rounded-xl">
-                  No follow-up tasks registered.
-                </div>
-              ) : (
-                followUpEntries.map((task) => {
-                  const details = task.contentPayload.followupDetails;
-                  const isCompleted = details?.completed;
-
-                  return (
-                    <div
-                      key={task.id}
-                      className={`p-2.5 rounded-xl border transition-all text-xs font-mono space-y-1 ${
-                        isCompleted
-                          ? "bg-slate-950/40 border-slate-800/60 opacity-60"
-                          : "bg-slate-950 border-slate-800"
-                      }`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleTask(task.id)}
-                          className="mt-0.5 text-slate-400 hover:text-amber-400 cursor-pointer shrink-0"
-                        >
-                          {isCompleted ? (
-                            <CheckSquare className="w-4 h-4 text-emerald-400" />
-                          ) : (
-                            <Square className="w-4 h-4 text-slate-600" />
-                          )}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-slate-200 ${isCompleted ? "line-through text-slate-500" : ""}`}>
-                            {details?.task || task.title}
-                          </p>
-                          <div className="flex items-center gap-2 pt-1 text-[9px]">
-                            <span
-                              className={`px-1.5 py-0.2 rounded font-bold uppercase ${
-                                details?.priority === "urgent"
-                                  ? "bg-rose-500/20 text-rose-400"
-                                  : details?.priority === "high"
-                                  ? "bg-amber-500/20 text-amber-400"
-                                  : "bg-slate-800 text-slate-400"
-                              }`}
-                            >
-                              {details?.priority || "Normal"}
-                            </span>
-                            {details?.dueDate && (
-                              <span className="text-slate-500">Due: {details.dueDate}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </section>
-      </main>
-
-      {/* ========================================================================= */}
-      {/* 3. MODALS */}
-      {/* ========================================================================= */}
-      {/* Add Custom Source Modal */}
-      {isAddSourceModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 text-slate-100 font-sans">
-            <h2 className="text-sm font-bold text-white font-mono">
-              Ingest Document or Research Note
-            </h2>
-
-            <form onSubmit={handleAddSourceSubmit} className="space-y-3 font-mono text-xs">
-              <div className="space-y-1">
-                <label className="text-slate-400">Document Title *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Cedar AI Syndicate Term Sheet Guidelines 2026"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-slate-400">Category</label>
-                  <select
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value as WorkspaceCategory)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500"
-                  >
-                    <option value="research">Research & Dossier</option>
-                    <option value="contact">CRM Contact</option>
-                    <option value="note">Scratchpad Note</option>
-                    <option value="followup">Action Item / Task</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-slate-400">Tags (comma-separated)</label>
-                  <input
-                    type="text"
-                    value={newTags}
-                    onChange={(e) => setNewTags(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500"
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Pitch Note / Context for {introTarget.label}
+                  </label>
+                  <textarea
+                    rows={4}
+                    placeholder="Briefly state your purpose (e.g., Seed investment thesis fit, requesting technical advisory on LLMs, or co-founder discussion)..."
+                    value={pitchNote}
+                    onChange={(e) => setPitchNote(e.target.value)}
+                    className="w-full bg-[#FAFCFA] border border-[#D7E7D6] rounded-xl p-3 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#75AC73]"
                   />
                 </div>
-              </div>
 
-              <div className="space-y-1">
-                <label className="text-slate-400">Markdown Content Body *</label>
-                <textarea
-                  required
-                  rows={6}
-                  placeholder="Paste or write the dossier, interview findings, or markdown notes..."
-                  value={newText}
-                  onChange={(e) => setNewText(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 resize-none font-mono"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsAddSourceModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingNewSource}
-                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{isSubmittingNewSource ? "Ingesting..." : "Save to Second Brain"}</span>
-                </button>
-              </div>
-            </form>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setIntroTarget(null)}
+                    className="px-4 py-2 rounded-xl bg-white border border-[#D7E7D6] hover:bg-[#EBF3EA] text-slate-700 text-xs font-semibold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRequestIntro}
+                    disabled={isSubmittingIntro}
+                    className="px-4 py-2 rounded-xl bg-[#75AC73] hover:bg-[#5A8D58] disabled:opacity-50 text-white text-xs font-bold shadow-xs flex items-center gap-2 transition-all"
+                  >
+                    {isSubmittingIntro ? (
+                      <span>Dispatching Intro...</span>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Confirm & Send Request (25 CR)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* WhatsApp Modal */}
-      <WhatsAppIntegrationModal
-        isOpen={isWhatsAppModalOpen}
-        onClose={() => setIsWhatsAppModalOpen(false)}
-        user={user}
-        onEntryAdded={(entry) => {
-          if (workspace) {
-            setWorkspace({
-              ...workspace,
-              entries: [entry, ...workspace.entries]
-            });
-            setSelectedEntryIds((prev) => [entry.id, ...prev]);
-            setActiveViewingEntryId(entry.id);
-          }
-        }}
-      />
-
-      {/* System Architecture & Tests Modal */}
-      <SystemArchitectureModal
-        isOpen={isArchModalOpen}
-        onClose={() => setIsArchModalOpen(false)}
-      />
+      {/* Toast Notification */}
+      {toastFeedback && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 bg-slate-900 text-white rounded-xl shadow-lg flex items-center gap-2 text-xs font-bold font-mono animate-in fade-in slide-in-from-bottom-2">
+          <Check className="w-4 h-4 text-emerald-400" />
+          <span>{toastFeedback}</span>
+        </div>
+      )}
     </div>
   );
 };

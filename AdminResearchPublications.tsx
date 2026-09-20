@@ -1,437 +1,238 @@
-export interface CommunityNewsStory {
-  id: string;
-  title: string;
-  slug: string;
-  excerpt: string;
-  content: string;
-  category: 
-    | "Startup Launch" 
-    | "Funding Round" 
-    | "AI & DeepTech" 
-    | "Research & Lab" 
-    | "Partnership" 
-    | "Grants & Awards" 
-    | "Community & Talent";
-  authorName: string;
-  authorRole: string;
-  authorEmail: string;
-  authorPhone?: string;
-  entityName: string;
-  entityUrl?: string;
-  publishedAt: string;
-  timestamp: number;
-  readTime: string;
-  imageUrl?: string;
-  tags: string[];
-  status: "published" | "pending" | "featured" | "rejected";
-  founderQuote?: string;
-  externalSourceUrl?: string;
-  viewsCount: number;
-  likesCount: number;
-  isOfficial?: boolean;
-  isCommunitySubmitted?: boolean;
-  certifiedAccurate?: boolean;
-  certifiedNoPlagiarism?: boolean;
-  certifiedTermsAccepted?: boolean;
-  certifiedAt?: string;
+import React from "react";
+import { MessageCircle, Share2, ArrowUpRight, Globe, Newspaper } from "lucide-react";
+
+export interface SocialMediaBannerProps {
+  id?: string;
+  className?: string;
+  variant?: "default" | "compact" | "footer";
 }
 
-const STORAGE_KEY = "961ai_community_news_stories";
-
-export const INITIAL_COMMUNITY_NEWS: CommunityNewsStory[] = [
+export const SOCIAL_LINKS = [
   {
-    id: "news-comm-1",
-    title: "CedarVision Edge AI Secures $500K Pre-Seed to Deploy Battery-Less AgTech Cameras Across Southern Lebanese Farms",
-    slug: "cedarvision-edge-ai-secures-pre-seed-agtech",
-    excerpt: "Spun out of the American University of Beirut AgTech lab, CedarVision leverages INT8 edge neural networks to detect olive fruit fly infestations in real-time without mobile data connectivity.",
-    content: `CedarVision AI, an agritech hardware and edge-computing startup originating from research laboratories at the American University of Beirut (AUB), has finalized a $500,000 pre-seed funding round led by a consortium of diaspora Lebanese angels across Geneva and the San Francisco Bay Area.
-
-The startup designs custom solar-scavenging optical cameras integrated with ultra-low-power microcontrollers. By running 8-bit quantized visual classification models directly on-device, CedarVision monitors microclimate metrics and detects the Olive Fruit Fly (Bactrocera oleae) before larval infestation ruins olive yields.
-
-"Lebanese agricultural cooperatives lose up to 35% of their premium extra-virgin oil harvest annually due to unpredictable pest swarms," explained Charbel Azzi, Co-founder and Chief Technology Officer. "Cloud-reliant IoT architectures completely fail in high-elevation Lebanese rural valleys due to cellular blackouts. CedarVision computes directly at the branch level, delivering predictive alerts to farmers via mesh SMS gateways."
-
-The company plans to deploy 350 sensory nodes across Hasbaya, Koura, and Mount Lebanon before expanding pilot programs into Greek and Spanish Mediterranean partner groves.`,
-    category: "Funding Round",
-    authorName: "Charbel Azzi",
-    authorRole: "Co-Founder & CTO",
-    authorEmail: "c.azzi@cedarvision.ai",
-    authorPhone: "+961 71 884 921",
-    entityName: "CedarVision AI (AUB AgTech Lab)",
-    entityUrl: "https://cedarvision.ai",
-    publishedAt: "September 14, 2026",
-    timestamp: 1789456800000,
-    readTime: "3 min read",
-    imageUrl: "https://images.unsplash.com/photo-1586771107445-d3ca888129ff?q=80&w=1000&auto=format&fit=crop",
-    tags: ["#AgTech", "#EdgeAI", "#PreSeed", "#AUB", "#Hardware"],
-    status: "published",
-    founderQuote: "We engineered our models to survive brownouts and connectivity loss. Innovation from Lebanon must be resilient by design.",
-    externalSourceUrl: "https://cedarvision.ai/press/pre-seed-close",
-    viewsCount: 1420,
-    likesCount: 88,
-    isOfficial: true,
-    isCommunitySubmitted: true
+    id: "whatsapp-961ai",
+    name: "WhatsApp Group: the961aiNetwork",
+    shortLabel: "WhatsApp: the961aiNetwork",
+    subtitle: "Real-time AI alerts, founder deal flow & syndicate updates",
+    url: "https://chat.whatsapp.com/JDHRJSfPuTWLxru7kNNoOC",
+    iconColor: "text-emerald-500",
+    bgHover: "hover:border-emerald-500/60 hover:bg-emerald-500/10",
+    badge: "Official Chat",
+    platform: "WhatsApp",
   },
   {
-    id: "news-comm-2",
-    title: "MindLab Beirut & LAU Release 'Phoenicia-7B': Open-Weights Dialectical LLM Optimized for Levant Commercial Law",
-    slug: "mindlab-beirut-lau-release-phoenicia-7b-legal-llm",
-    excerpt: "Trained across 40,000 digitized Lebanese Official Gazette decrees and bilateral treaties, Phoenicia-7B benchmarks 28% higher accuracy in parsing Law 126/2019 offshore holding structures than generic foundation models.",
-    content: `In an unprecedented joint collaboration between MindLab Beirut and the Lebanese American University (LAU) AI Research Hub, researchers have open-sourced 'Phoenicia-7B' under an MIT Apache-2.0 hybrid academic license.
-
-Phoenicia-7B is an instruction-tuned generative transformer model pretrained exclusively on Levant corporate statutory jurisprudence, Lebanese Commercial Code articles, and bilateral double-taxation treaties across Cyprus, France, and the GCC.
-
-Standard international models frequently hallucinate or confuse French Civil Law underpinnings with Anglo-Saxon Common Law precedents. Phoenicia-7B addresses this gap by directly embedding Lebanese Official Gazette decrees, BDL regulatory circulars, and the landmark Law 126/2019 offshore exemption statutes.
-
-"Our benchmark evaluations show an 89.4% precision score when drafting articles of association for Lebanese S.A.L. offshore vehicles compared to 61% from standard commercial API models," stated Dr. Nour Haddad, Principal NLP Scientist at MindLab Beirut.
-
-The model checkpoint is available for direct evaluation and fine-tuning via Hugging Face and 961AI's sovereign Second Brain Notebook workspaces.`,
-    category: "AI & DeepTech",
-    authorName: "Dr. Nour Haddad",
-    authorRole: "Principal NLP Scientist",
-    authorEmail: "n.haddad@mindlab.beirut.edu.lb",
-    authorPhone: "+961 01 786 456",
-    entityName: "MindLab Beirut & LAU AI Institute",
-    entityUrl: "https://mindlab.ai.lb",
-    publishedAt: "September 12, 2026",
-    timestamp: 1789284000000,
-    readTime: "4 min read",
-    imageUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=1000&auto=format&fit=crop",
-    tags: ["#LLM", "#OpenWeights", "#LegalTech", "#OffshoreLaw", "#LAU"],
-    status: "published",
-    founderQuote: "Sovereignty in AI starts with language and law. Phoenicia-7B gives every Lebanese attorney and startup founder institutional-grade legal copilot intelligence.",
-    externalSourceUrl: "https://huggingface.co/mindlab-beirut/phoenicia-7b",
-    viewsCount: 2150,
-    likesCount: 142,
-    isOfficial: true,
-    isCommunitySubmitted: true
+    id: "whatsapp-alkhawarizmi",
+    name: "WhatsApp Group: AlKhawarizmiCommunity",
+    shortLabel: "WhatsApp: AlKhawarizmiCommunity",
+    subtitle: "Applied AI developers, researchers & prompt engineers",
+    url: "https://chat.whatsapp.com/KdqHl2Rj60pGUgvAV2TM20",
+    iconColor: "text-emerald-400",
+    bgHover: "hover:border-emerald-400/60 hover:bg-emerald-400/10",
+    badge: "Developers",
+    platform: "WhatsApp",
   },
   {
-    id: "news-comm-3",
-    title: "FinTech Startup 'LiraFlow' Integrates Whish Money & BDL Clearing Rails for Zero-Fee Remittance Routing",
-    slug: "liraflow-integrates-whish-bdl-clearing-remittance",
-    excerpt: "Connecting diaspora family members in Montreal, Paris, and Dubai directly to Lebanese mobile wallets with sub-minute settlement and local USD terminal cash-outs.",
-    content: `Beirut-headquartered payment rails startup LiraFlow S.A.L. has announced the general availability of its diaspora-to-homeland liquidity bridge, partnering with licensed local electronic money operators including Whish Money and commercial banking escrow networks.
-
-Historically, Lebanese expats remitting funds to parents and university students incurred punitive international wire charges of 7% to 12%, followed by arbitrary foreign exchange conversion markups at local teller branches.
-
-LiraFlow's micro-clearing protocol utilizes cryptographically secured settlement vouchers that instantly fund recipients' Whish Money balances in crisp USD cash equivalents, redeemable at over 1,400 neighborhood agents across Tripoli, Saida, Zahle, and Greater Beirut.
-
-"Remittances constitute more than 35% of Lebanon's real gross domestic product," noted Karim Mansour, CEO of LiraFlow. "Our mission is to eliminate transaction friction. If an expat in Montreal sends $200 for family medication, exactly $200 arrives in their parent's hands within 45 seconds."
-
-Over $4.2M in volume was processed during the closed beta phase, achieving a 99.8% uptime rate during peak holiday transfer spikes.`,
-    category: "Startup Launch",
-    authorName: "Karim Mansour",
-    authorRole: "CEO & Co-Founder",
-    authorEmail: "karim@liraflow.com",
-    authorPhone: "+961 70 247 961",
-    entityName: "LiraFlow S.A.L.",
-    entityUrl: "https://liraflow.com",
-    publishedAt: "September 10, 2026",
-    timestamp: 1789111200000,
-    readTime: "3 min read",
-    imageUrl: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?q=80&w=1000&auto=format&fit=crop",
-    tags: ["#Fintech", "#Remittances", "#WhishMoney", "#Diaspora", "#Payments"],
-    status: "published",
-    founderQuote: "Cutting remittance fees from 10% to zero directly injects millions of dollars back into Lebanese household economies every single month.",
-    externalSourceUrl: "https://liraflow.com/news/launch",
-    viewsCount: 1890,
-    likesCount: 116,
-    isOfficial: true,
-    isCommunitySubmitted: true
+    id: "linkedin-group",
+    name: "LinkedIn: Al Khawarizmi Community / the 961ai Network",
+    shortLabel: "LinkedIn Community",
+    subtitle: "Diaspora investors, executive syndicate & career bridges",
+    url: "https://www.linkedin.com/groups/10064575/",
+    iconColor: "text-sky-400",
+    bgHover: "hover:border-sky-400/60 hover:bg-sky-400/10",
+    badge: "Executive Network",
+    platform: "LinkedIn",
   },
   {
-    id: "news-comm-4",
-    title: "Berytech Cleantech Accelerator Awards $150,000 in Non-Dilutive Grants to 6 Distributed Solar AI Grids",
-    slug: "berytech-awards-cleantech-grants-distributed-solar-ai",
-    excerpt: "Engineered by teams across Tripoli and Chouf, autonomous load-balancing micro-inverters maintain 99.4% uninterrupted electricity for regional hospital oncology and cold-chain facilities.",
-    content: `Berytech, in alliance with international renewable grant partners, has selected six pioneering Lebanese cleantech ventures to receive $150,000 in non-dilutive capital grants, industrial prototyping lab facilities, and certified UL testing clearances.
-
-The cohort winners focus on decentralized distributed micro-grids that automatically negotiate battery storage discharge during national grid blackouts. Using localized reinforcement learning algorithms running on edge microcontrollers, the systems dynamically shed residential luxury loads while prioritizing life-support machinery, vaccine cold-storage, and communal water filtration pumps.
-
-"The acute power infrastructure challenges of Lebanon have forced our hardware and electrical engineers to become the most resourceful grid innovators in the world," stated Maya Khoury, Ecosystem Program Director at Berytech. "These teams are not just solving a domestic survival issue; they are building export-ready technology for emerging markets across Sub-Saharan Africa and Central Asia."
-
-The six selected ventures will present live operational field telemetry at the upcoming Beirut Cleantech Summit in October.`,
-    category: "Grants & Awards",
-    authorName: "Maya Khoury",
-    authorRole: "Ecosystem Program Director",
-    authorEmail: "m.khoury@berytech.org",
-    authorPhone: "+961 04 533 040",
-    entityName: "Berytech Cleantech Accelerator",
-    entityUrl: "https://berytech.org",
-    publishedAt: "September 8, 2026",
-    timestamp: 1788938400000,
-    readTime: "3 min read",
-    imageUrl: "https://images.unsplash.com/photo-1509391365360-2e959784a276?q=80&w=1000&auto=format&fit=crop",
-    tags: ["#Cleantech", "#MicroGrants", "#SolarAI", "#Berytech", "#Energy"],
-    status: "published",
-    founderQuote: "Lebanon's power deficit became our ultimate testbed. We have engineered the most battle-tested solar battery management systems on Earth.",
-    externalSourceUrl: "https://berytech.org/programs/cleantech-grants-2026",
-    viewsCount: 1670,
-    likesCount: 94,
-    isOfficial: true,
-    isCommunitySubmitted: true
+    id: "substack-newsletter",
+    name: "Substack: z961ainetwork",
+    shortLabel: "Substack Newsletter",
+    subtitle: "Weekly sovereign AI briefings, regulatory analysis & deal digests",
+    url: "https://z961ainetwork.substack.com/",
+    iconColor: "text-amber-400",
+    bgHover: "hover:border-amber-400/60 hover:bg-amber-400/10",
+    badge: "Newsletter",
+    platform: "Substack",
   },
   {
-    id: "news-comm-5",
-    title: "Dubai Angel Syndicate Allocates $1.2M Special Purpose Vehicle Exclusively for Lebanese AI Founders",
-    slug: "dubai-angel-syndicate-allocates-spv-lebanese-ai-founders",
-    excerpt: "Providing fast-tracked SAFE agreements, dual Delaware/Lebanese Law 126 offshore corporate mirror setups, and direct customer introductions to GCC enterprise buyers.",
-    content: `A group of senior Lebanese diaspora executives based in Dubai Internet City and the Abu Dhabi Global Market (ADGM) has announced the establishment of the 'Cedar Angels SPV I', a dedicated $1,200,000 investment syndicate designed specifically for seed-stage Lebanese artificial intelligence and enterprise software startups.
-
-The syndicate utilizes standardized post-money Simple Agreements for Future Equity (SAFE) notes, with ticket sizes ranging between $75,000 and $150,000 per startup. A core requirement of the syndicate is that portfolio companies maintain their primary engineering and research hubs in Lebanon while using offshore commercial entities for frictionless international invoicing and regional client billing.
-
-"Lebanon possesses world-class algorithmic talent that costs 70% less than equivalent engineering teams in London or Silicon Valley," stated Ziad Ghanem, Managing Partner of the syndicate. "Our syndicate is not charity. It is a calculated, high-conviction commercial play on the intellectual horsepower of Lebanese youth. We provide the capital, the corporate legal architecture, and the executive meetings across UAE and Saudi government ministries."
-
-Startups can apply directly through 961AI's Pitch Room and Diaspora Matchmaking engines.`,
-    category: "Partnership",
-    authorName: "Ziad Ghanem",
-    authorRole: "Managing Partner",
-    authorEmail: "ziad@cedar-angels.ae",
-    authorPhone: "+971 4 391 0000",
-    entityName: "LebNet Diaspora Angels & Cedar Capital SPV",
-    entityUrl: "https://lebnet.us",
-    publishedAt: "September 6, 2026",
-    timestamp: 1788765600000,
-    readTime: "4 min read",
-    imageUrl: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=1000&auto=format&fit=crop",
-    tags: ["#DiasporaVC", "#Syndicate", "#OffshoreSAL", "#AngelInvesting", "#UAE"],
-    status: "published",
-    founderQuote: "We are bridging the gap between Beirut's brilliant technical minds and the vast enterprise procurement budgets of the Arabian Gulf.",
-    externalSourceUrl: "https://cedar-angels.ae/announcements/spv-launch",
-    viewsCount: 2310,
-    likesCount: 175,
-    isOfficial: true,
-    isCommunitySubmitted: true
+    id: "twitter-x",
+    name: "X (Twitter): @the961ainetwork",
+    shortLabel: "X (Twitter) @the961ainetwork",
+    subtitle: "Fast-breaking AI ecosystem updates & community threads",
+    url: "https://x.com/the961ainetwork",
+    iconColor: "text-slate-200",
+    bgHover: "hover:border-slate-300 hover:bg-slate-700/40",
+    badge: "@the961ainetwork",
+    platform: "X",
   },
   {
-    id: "news-comm-6",
-    title: "Beirut AI Hackathon Concludes: Top Honor Awarded to Synthetic CT Oncology Diagnostic Copilot",
-    slug: "beirut-ai-hackathon-synthetic-ct-oncology-copilot",
-    excerpt: "180 developers and medical residents competed over 48 hours in Mar Mikhael to train lightweight vision transformers that detect early-stage lung carcinomas on low-resolution CT scanners.",
-    content: `The 2026 Beirut AI Community Hackathon wrapped up on Sunday evening with 42 teams presenting working clinical demonstrations before a panel of oncologists, bioethicists, and venture capital partners.
-
-The championship prize was awarded to Team 'RadIA', comprising three LAU biomedical engineering graduates and two Saint George Hospital medical residents. Over the 48-hour sprint, the team developed a vision transformer model capable of segmenting pulmonary nodules from noisy, low-slice-count CT scans common in underfunded public regional hospitals.
-
-"In rural healthcare clinics, doctors often work with ten-year-old imaging hardware that produces significant visual artifacting," explained Tala Salloum, lead developer at RadIA. "Our synthetic contrast model reconstructs micro-density boundaries with 94.2% sensitivity, providing the radiologist with second-opinion heatmaps in under 4 seconds."
-
-The team received a $10,000 cash grant, 100,000 961AI compute credits, and free incubation support at Saint George University Hospital's Clinical Research Center.`,
-    category: "Community & Talent",
-    authorName: "Tala Salloum",
-    authorRole: "Lead BioAI Developer",
-    authorEmail: "tala.salloum@radia.health",
-    authorPhone: "+961 76 991 320",
-    entityName: "Beirut AI & RadIA Health Hub",
-    entityUrl: "https://beirut.ai",
-    publishedAt: "September 4, 2026",
-    timestamp: 1788592800000,
-    readTime: "3 min read",
-    imageUrl: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?q=80&w=1000&auto=format&fit=crop",
-    tags: ["#BeirutAI", "#HealthTech", "#Hackathon", "#Oncology", "#ComputerVision"],
-    status: "published",
-    founderQuote: "When Lebanese doctors and software engineers collaborate under pressure, we build solutions that can save lives anywhere in the developing world.",
-    externalSourceUrl: "https://beirut.ai/hackathon-2026-winners",
-    viewsCount: 1980,
-    likesCount: 139,
-    isOfficial: true,
-    isCommunitySubmitted: true
-  }
+    id: "facebook-group",
+    name: "Facebook: 961AI & AlKhawarizmi Group",
+    shortLabel: "Facebook Group",
+    subtitle: "Lebanese innovation ecosystem discussions & meetups",
+    url: "https://www.facebook.com/groups/1114245954347125",
+    iconColor: "text-blue-400",
+    bgHover: "hover:border-blue-400/60 hover:bg-blue-400/10",
+    badge: "Community",
+    platform: "Facebook",
+  },
 ];
 
-export function getCommunityNews(): CommunityNewsStory[] {
-  if (typeof window === "undefined") return INITIAL_COMMUNITY_NEWS;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_COMMUNITY_NEWS));
-      return INITIAL_COMMUNITY_NEWS;
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_COMMUNITY_NEWS));
-      return INITIAL_COMMUNITY_NEWS;
-    }
-    return parsed;
-  } catch (err) {
-    console.warn("Failed to read community news from localStorage:", err);
-    return INITIAL_COMMUNITY_NEWS;
+// Helper to render branded SVG icons cleanly
+export const SocialPlatformIcon: React.FC<{ platform: string; className?: string }> = ({ platform, className = "w-5 h-5" }) => {
+  switch (platform) {
+    case "WhatsApp":
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+        </svg>
+      );
+    case "LinkedIn":
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
+        </svg>
+      );
+    case "Substack":
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M22.539 8.242H1.46V5.406h21.08v2.836zM1.46 10.812V24L12 18.11 22.54 24V10.812H1.46zM22.54 0H1.46v2.836h21.08V0z" />
+        </svg>
+      );
+    case "X":
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+        </svg>
+      );
+    case "Facebook":
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+        </svg>
+      );
+    default:
+      return <Globe className={className} />;
   }
-}
+};
 
-export function saveCommunityNews(stories: CommunityNewsStory[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stories));
-    window.dispatchEvent(new Event("961ai_community_news_updated"));
-  } catch (err) {
-    console.warn("Failed to write community news to localStorage:", err);
+export const SocialMediaBanner: React.FC<SocialMediaBannerProps> = ({
+  id = "social-media-network-banner",
+  className = "",
+  variant = "default",
+}) => {
+  if (variant === "footer") {
+    return (
+      <div id={id} className={`rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-[#122815] border-2 border-emerald-500/40 p-6 text-white shadow-md ${className}`}>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-1.5 max-w-xl">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded bg-emerald-500 text-slate-950 text-[10px] font-mono font-black uppercase tracking-wider">
+                COMMUNITY DIRECT CONNECT
+              </span>
+              <span className="text-xs font-bold text-emerald-400 font-mono">
+                Join Our Social Media Network
+              </span>
+            </div>
+            <h3 className="text-lg font-black text-white tracking-tight">
+              Connect with 961AI & AlKhawarizmi Community Channels
+            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Real-time sovereign AI updates, WhatsApp founder circles, deep-tech research papers, and diaspora co-investment syndicates.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 w-full lg:w-auto">
+            {SOCIAL_LINKS.map((item) => (
+              <a
+                key={item.id}
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white text-xs font-semibold transition-all ${item.bgHover} group`}
+              >
+                <div className={`${item.iconColor} shrink-0 transition-transform group-hover:scale-110`}>
+                  <SocialPlatformIcon platform={item.platform} className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[11px] font-mono">{item.shortLabel}</div>
+                </div>
+                <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-white shrink-0" />
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
-}
 
-export function addCommunityNewsStory(
-  data: Omit<CommunityNewsItemInput, "id">
-): CommunityNewsStory {
-  const current = getCommunityNews();
-  const id = `news-comm-${Date.now()}`;
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric"
-  });
+  // Default banner layout (for placement right before Joint National Initiative section)
+  return (
+    <section
+      id={id}
+      className={`rounded-2xl bg-gradient-to-br from-slate-950 via-[#0B1510] to-[#122818] border-2 border-emerald-500/60 p-6 sm:p-7 text-white shadow-lg shadow-emerald-950/20 relative overflow-hidden font-sans ${className}`}
+    >
+      {/* Background ambient lighting */}
+      <div className="absolute -top-16 -right-16 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-16 -left-16 w-56 h-56 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
-  const slug = data.title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "") || `story-${id}`;
+      <div className="relative z-10 space-y-5">
+        {/* Header Bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-emerald-500/20 pb-4">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2.5 py-1 rounded-md bg-emerald-500 text-slate-950 text-[10px] font-mono font-black uppercase tracking-wider">
+                COMMUNITY DIRECT ACCESS
+              </span>
+              <span className="text-xs font-bold text-emerald-400 font-mono">
+                Alkharizmi Solutions & NCEI Lebanon Joint Network
+              </span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Join Our Social Media Network
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Stay in the loop with live updates, WhatsApp founder circles, deep-tech research, and diaspora investor briefings.
+            </p>
+          </div>
 
-  const words = (data.content || "").split(/\s+/).length;
-  const readMinutes = Math.max(1, Math.ceil(words / 180));
-  const readTime = `${readMinutes} min read`;
+          <div className="flex items-center gap-2 self-start md:self-auto text-xs font-mono text-emerald-400 bg-emerald-950/60 px-3 py-1.5 rounded-lg border border-emerald-500/30">
+            <Share2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Official Verified Channels</span>
+          </div>
+        </div>
 
-  const newStory: CommunityNewsStory = {
-    id,
-    title: data.title.trim(),
-    slug,
-    excerpt: data.excerpt.trim() || data.content.slice(0, 180) + "...",
-    content: data.content.trim(),
-    category: data.category || "Startup Launch",
-    authorName: data.authorName.trim(),
-    authorRole: data.authorRole?.trim() || "Community Member",
-    authorEmail: data.authorEmail.trim(),
-    authorPhone: data.authorPhone?.trim() || "+961",
-    entityName: data.entityName.trim(),
-    entityUrl: data.entityUrl?.trim() || "",
-    publishedAt: dateStr,
-    timestamp: Date.now(),
-    readTime,
-    imageUrl: data.imageUrl || "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=1000&auto=format&fit=crop",
-    tags: Array.isArray(data.tags) ? data.tags : ["#Lebanon", "#Startup", "#Tech"],
-    status: data.status || "pending", // Default to pending review for manual admin publishing
-    founderQuote: data.founderQuote?.trim(),
-    externalSourceUrl: data.externalSourceUrl?.trim(),
-    viewsCount: 1,
-    likesCount: 0,
-    isOfficial: false,
-    isCommunitySubmitted: true,
-    certifiedAccurate: data.certifiedAccurate ?? true,
-    certifiedNoPlagiarism: data.certifiedNoPlagiarism ?? true,
-    certifiedTermsAccepted: data.certifiedTermsAccepted ?? true,
-    certifiedAt: data.certifiedAt || new Date().toISOString()
-  };
+        {/* 6 Social Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {SOCIAL_LINKS.map((link) => (
+            <a
+              key={link.id}
+              id={`social-link-${link.id}`}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`p-3.5 sm:p-4 rounded-xl bg-slate-900/90 border border-emerald-500/30 hover:border-emerald-400 text-white transition-all transform active:scale-98 group flex items-start gap-3.5 ${link.bgHover}`}
+            >
+              <div className={`p-2.5 rounded-xl bg-slate-800 border border-slate-700/80 ${link.iconColor} shrink-0 group-hover:scale-105 transition-transform shadow-xs`}>
+                <SocialPlatformIcon platform={link.platform} className="w-5 h-5" />
+              </div>
 
-  const updated = [newStory, ...current];
-  saveCommunityNews(updated);
-  return newStory;
-}
-
-export interface CommunityNewsItemInput {
-  title: string;
-  excerpt: string;
-  content: string;
-  category: CommunityNewsStory["category"];
-  authorName: string;
-  authorRole?: string;
-  authorEmail: string;
-  authorPhone?: string;
-  entityName: string;
-  entityUrl?: string;
-  imageUrl?: string;
-  tags?: string[];
-  founderQuote?: string;
-  externalSourceUrl?: string;
-  status?: CommunityNewsStory["status"];
-  certifiedAccurate?: boolean;
-  certifiedNoPlagiarism?: boolean;
-  certifiedTermsAccepted?: boolean;
-  certifiedAt?: string;
-}
-
-export function updateCommunityNewsStory(
-  id: string,
-  updates: Partial<CommunityNewsStory>
-): CommunityNewsStory | null {
-  const current = getCommunityNews();
-  const idx = current.findIndex((s) => s.id === id);
-  if (idx === -1) return null;
-  const updated = { ...current[idx], ...updates };
-  current[idx] = updated;
-  saveCommunityNews(current);
-  return updated;
-}
-
-export function updateCommunityNewsStatus(
-  id: string,
-  newStatus: CommunityNewsStory["status"]
-): boolean {
-  const current = getCommunityNews();
-  const idx = current.findIndex((s) => s.id === id);
-  if (idx === -1) return false;
-  current[idx].status = newStatus;
-  saveCommunityNews(current);
-  return true;
-}
-
-export function deleteCommunityNewsStory(id: string): boolean {
-  const current = getCommunityNews();
-  const filtered = current.filter((s) => s.id !== id);
-  if (filtered.length === current.length) return false;
-  saveCommunityNews(filtered);
-  return true;
-}
-
-export function likeCommunityNewsStory(id: string): number {
-  const current = getCommunityNews();
-  const idx = current.findIndex((s) => s.id === id);
-  if (idx === -1) return 0;
-  current[idx].likesCount = (current[idx].likesCount || 0) + 1;
-  saveCommunityNews(current);
-  return current[idx].likesCount;
-}
-
-export function incrementCommunityNewsViews(id: string): void {
-  const current = getCommunityNews();
-  const idx = current.findIndex((s) => s.id === id);
-  if (idx === -1) return;
-  current[idx].viewsCount = (current[idx].viewsCount || 0) + 1;
-  saveCommunityNews(current);
-}
-
-export function exportCommunityNewsCsv(): string {
-  const stories = getCommunityNews();
-  const headers = [
-    "ID",
-    "Title",
-    "Category",
-    "Entity Name",
-    "Author Name",
-    "Author Email",
-    "Author Phone",
-    "Status",
-    "Certified Accurate",
-    "Certified No Plagiarism",
-    "Terms Accepted",
-    "Published At",
-    "Views",
-    "Likes",
-    "Tags"
-  ];
-  const rows = stories.map((s) => [
-    `"${s.id}"`,
-    `"${s.title.replace(/"/g, '""')}"`,
-    `"${s.category}"`,
-    `"${s.entityName.replace(/"/g, '""')}"`,
-    `"${s.authorName.replace(/"/g, '""')}"`,
-    `"${s.authorEmail}"`,
-    `"${s.authorPhone || ""}"`,
-    `"${s.status}"`,
-    `"${s.certifiedAccurate ? 'YES' : 'NO'}"`,
-    `"${s.certifiedNoPlagiarism ? 'YES' : 'NO'}"`,
-    `"${s.certifiedTermsAccepted ? 'YES' : 'NO'}"`,
-    `"${s.publishedAt}"`,
-    s.viewsCount || 0,
-    s.likesCount || 0,
-    `"${(s.tags || []).join(", ")}"`
-  ]);
-
-  return [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-}
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                    {link.badge}
+                  </span>
+                  <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-white transition-colors shrink-0" />
+                </div>
+                <h4 className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-300 transition-colors leading-snug truncate">
+                  {link.name}
+                </h4>
+                <p className="text-[11px] text-slate-400 line-clamp-2 leading-tight">
+                  {link.subtitle}
+                </p>
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};

@@ -1,594 +1,734 @@
-import { MailingListSubscriber } from "../types";
-import { triggerNotificationForSubscriberStatus } from "./notificationQueue";
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  X,
+  Lightbulb,
+  Paperclip,
+  FileText,
+  CheckCircle2,
+  Send,
+  UploadCloud,
+  ArrowRight,
+  RotateCcw,
+  Sparkles,
+  Layers,
+  Check
+} from "lucide-react";
+import { IdeaCategory, IdeaStatus, EcosystemIdea } from "../../../types";
 
-export interface MailingListRegistration {
-  id: string;
-  email: string;
-  name: string;
-  role?: string;
-  affiliation?: string;
-  source: string;
-  subscribedAt: string;
-  status: "Active" | "Verified" | "Unsubscribed";
-  gdprConsent: boolean;
-  notes?: string;
+export interface SubmitIdeaDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmitIdea: (idea: Partial<EcosystemIdea>) => Promise<void> | void;
+  categories?: IdeaCategory[];
+  onTriggerStatusUpdate?: (ideaId: string, status: IdeaStatus, notes?: string) => Promise<void>;
 }
 
-export interface TrialUser {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  affiliation: string;
-  whatsappPhone?: string;
-  registeredAt: string;
-  demoExpiresAt: number; // timestamp ms
-  isTrialActive: boolean;
-  credits: number;
-  secondBrainId?: string;
-  status: "Active Trial" | "Expired Demo" | "Converted to Paid";
-  notes?: string;
-}
-
-export type SubscriptionPaymentStatus = "Pending Approval" | "Manual Payment Confirmed" | "Active";
-
-export interface ConfirmedSubscriber {
-  id: string;
-  email: string;
-  name: string;
-  phone?: string;
-  affiliation?: string;
-  plan: string;
-  amountPaid: string;
-  paymentMethod: "OMT" | "WHISH" | "USDT (TRC20)";
-  paymentRef: string;
-  confirmedAt: string;
-  expiresAt: string;
-  paymentStatus: SubscriptionPaymentStatus;
-  salesContactStatus: "Pending Contact" | "Contacted" | "Onboarded";
-  salesNotes?: string;
-}
-
-const STORAGE_KEYS = {
-  MAILING_LIST: "961ai_mailing_list",
-  TRIAL_USERS: "961ai_trial_users",
-  CONFIRMED_SUBSCRIBERS: "961ai_confirmed_subscribers",
-  REGISTERED_ACCOUNTS: "961ai_registered_users",
-  AUTH_USER: "961ai_auth_user"
-};
-
-// Seed Data for Mailing List
-const SEED_MAILING_LIST: MailingListRegistration[] = [
-  {
-    id: "mail_1",
-    email: "tariq.nader@polytechnique.fr",
-    name: "Dr. Tariq Nader",
-    role: "AI Guru / Researcher",
-    affiliation: "École Polytechnique / PhoeniciaAI",
-    source: "Hero Mailing List (Early Opt-In)",
-    subscribedAt: "2026-08-20 10:14",
-    status: "Verified",
-    gdprConsent: true,
-    notes: "Lead researcher on Arabic LLM quantization."
-  },
-  {
-    id: "mail_2",
-    email: "samir.matar@aub.edu.lb",
-    name: "Prof. Samir Matar",
-    role: "Stakeholder / Academic",
-    affiliation: "AUB AI Research Lab",
-    source: "Newsletter Footer (Lead Capture)",
-    subscribedAt: "2026-08-28 11:20",
-    status: "Active",
-    gdprConsent: true,
-    notes: "Subscribed to Lebanon AI & DeepTech Dispatch."
-  },
-  {
-    id: "mail_3",
-    email: "layla.kassir@beirut-ai.org",
-    name: "Layla Kassir",
-    role: "Community Lead",
-    affiliation: "Beirut AI Collective",
-    source: "Mailing List (Hero Bar)",
-    subscribedAt: "2026-09-02 14:05",
-    status: "Verified",
-    gdprConsent: true,
-    notes: "Requested monthly GPU and hackathon bulletins."
-  },
-  {
-    id: "mail_4",
-    email: "ziad.elkhoury@alumni.mit.edu",
-    name: "Ziad El Khoury",
-    role: "Diaspora Founder",
-    affiliation: "Boston-Beirut AI Bridge",
-    source: "Hero Lead Bar (Auto Opt-In)",
-    subscribedAt: "2026-09-05 09:30",
-    status: "Active",
-    gdprConsent: true,
-    notes: "Interested in sovereign LLM hosting & sandboxes."
-  }
+export const DEFAULT_IDEA_CATEGORIES: IdeaCategory[] = [
+  "Infrastructure",
+  "Policy & Regulation",
+  "Funding & Grants",
+  "Talent",
+  "Community Events"
 ];
 
-// Seed Data for Trial Users (Free 6-Hour Demo)
-const SEED_TRIAL_USERS: TrialUser[] = [
-  {
-    id: "trial_1",
-    email: "kareem.chahine@beirutangels.vc",
-    name: "Kareem Chahine",
-    role: "Investor",
-    affiliation: "Beirut Diaspora Capital",
-    whatsappPhone: "+961 70 882 119",
-    registeredAt: "2026-09-12 16:20",
-    demoExpiresAt: Date.now() + 3.5 * 3600 * 1000, // active trial
-    isTrialActive: true,
-    credits: 50,
-    secondBrainId: "ws_kareem_angel",
-    status: "Active Trial",
-    notes: "Evaluating 5 Lebanon deeptech startups on platform."
-  },
-  {
-    id: "trial_2",
-    email: "maya.khoury@hellotree.dev",
-    name: "Maya Khoury",
-    role: "Agency Lead",
-    affiliation: "Hellotree Digital Beirut",
-    whatsappPhone: "+961 71 445 231",
-    registeredAt: "2026-09-10 11:15",
-    demoExpiresAt: Date.now() - 48 * 3600 * 1000, // expired trial
-    isTrialActive: false,
-    credits: 12,
-    secondBrainId: "ws_hellotree_dev",
-    status: "Expired Demo",
-    notes: "Demo completed. Looking to upgrade via Whish Money."
-  },
-  {
-    id: "trial_3",
-    email: "rami.ghosn@cedarcloud.lb",
-    name: "Rami Ghosn",
-    role: "Founder",
-    affiliation: "CedarCloud Serverless",
-    whatsappPhone: "+961 03 992 410",
-    registeredAt: "2026-09-14 08:45",
-    demoExpiresAt: Date.now() + 5.2 * 3600 * 1000, // active trial
-    isTrialActive: true,
-    credits: 50,
-    secondBrainId: "ws_rami_cloud",
-    status: "Active Trial",
-    notes: "Testing 0% Offshore S.A.L. calculator & directory."
-  },
-  {
-    id: "trial_4",
-    email: "jad.bouhabib@beirutlab.ai",
-    name: "Jad Bou Habib",
-    role: "AI Developer",
-    affiliation: "Beirut Vision Labs",
-    whatsappPhone: "+961 81 229 004",
-    registeredAt: "2026-09-08 19:10",
-    demoExpiresAt: Date.now() - 72 * 3600 * 1000, // expired trial
-    isTrialActive: false,
-    credits: 0,
-    secondBrainId: "ws_jad_vision",
-    status: "Expired Demo",
-    notes: "Reached demo limit. Sent automated upgrade prompt."
-  }
-];
-
-// Seed Data for Confirmed Subscribers (Paid $100/yr via OMT / Whish / USDT)
-const SEED_CONFIRMED_SUBSCRIBERS: ConfirmedSubscriber[] = [
-  {
-    id: "sub_paid_1",
-    email: "nour.haddad@cedarshealth.ai",
-    name: "Nour Haddad",
-    phone: "+961 81 041 334",
-    affiliation: "CedarsHealth AI / Founder",
-    plan: "Annual Pro ($100/yr)",
-    amountPaid: "$100 USD",
-    paymentMethod: "WHISH",
-    paymentRef: "WHISH-961-88492-X",
-    confirmedAt: "2026-09-11 14:30",
-    expiresAt: "2027-09-11 14:30",
-    paymentStatus: "Active",
-    salesContactStatus: "Onboarded",
-    salesNotes: "Full payment received via Whish Money. 2,500 credits loaded."
-  },
-  {
-    id: "sub_paid_2",
-    email: "anthony.salameh@levantventure.com",
-    name: "Anthony Salameh",
-    phone: "+961 70 119 550",
-    affiliation: "Levant Venture Partners",
-    plan: "Annual Pro ($100/yr)",
-    amountPaid: "$100 USD",
-    paymentMethod: "OMT",
-    paymentRef: "OMT-BEY-440291-B",
-    confirmedAt: "2026-09-13 10:15",
-    expiresAt: "2027-09-13 10:15",
-    paymentStatus: "Active",
-    salesContactStatus: "Contacted",
-    salesNotes: "OMT Cash transfer confirmed by finance desk. Sales team confirmed syndicate access."
-  },
-  {
-    id: "sub_paid_3",
-    email: "fadi.makdissi@phoeniciatech.sal",
-    name: "Fadi Makdissi",
-    phone: "+961 03 552 918",
-    affiliation: "Phoenicia Tech S.A.L.",
-    plan: "Annual Pro ($100/yr)",
-    amountPaid: "$100 USD",
-    paymentMethod: "WHISH",
-    paymentRef: "WHISH-LB-771890",
-    confirmedAt: "2026-09-14 18:00",
-    expiresAt: "2027-09-14 18:00",
-    paymentStatus: "Pending Approval",
-    salesContactStatus: "Pending Contact",
-    salesNotes: "User upgraded via Whish Money. Manual settlement receipt submitted; pending approval."
-  },
-  {
-    id: "sub_paid_4",
-    email: "elena.mansour@diasporacap.org",
-    name: "Elena Mansour",
-    phone: "+1 617 892 4410",
-    affiliation: "Boston Diaspora Syndicate",
-    plan: "Annual Pro ($100/yr)",
-    amountPaid: "$100 USD",
-    paymentMethod: "USDT (TRC20)",
-    paymentRef: "TRC20-0x9a88fbc23190e7",
-    confirmedAt: "2026-09-09 12:00",
-    expiresAt: "2027-09-09 12:00",
-    paymentStatus: "Manual Payment Confirmed",
-    salesContactStatus: "Onboarded",
-    salesNotes: "On-chain verification complete. Manual payment confirmed."
-  }
-];
-
-// ================= MAILING LIST CRUD =================
-export function getMailingListRegistrations(): MailingListRegistration[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.MAILING_LIST);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.MAILING_LIST, JSON.stringify(SEED_MAILING_LIST));
-      return SEED_MAILING_LIST;
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      localStorage.setItem(STORAGE_KEYS.MAILING_LIST, JSON.stringify(SEED_MAILING_LIST));
-      return SEED_MAILING_LIST;
-    }
-    return parsed;
-  } catch {
-    return SEED_MAILING_LIST;
-  }
+interface AttachedFile {
+  id: string;
+  name: string;
+  size: string;
+  type: string;
 }
 
-export function addMailingListRegistration(
-  email: string,
-  name?: string,
-  role?: string,
-  affiliation?: string,
-  source = "Hero Mailing List",
-  notes?: string
-): MailingListRegistration {
-  const cleanEmail = (email || "").trim().toLowerCase();
-  const list = getMailingListRegistrations();
-  const existingIndex = list.findIndex((m) => m.email.toLowerCase() === cleanEmail);
+export const SubmitIdeaDrawer: React.FC<SubmitIdeaDrawerProps> = ({
+  isOpen,
+  onClose,
+  onSubmitIdea,
+  categories = DEFAULT_IDEA_CATEGORIES,
+  onTriggerStatusUpdate
+}) => {
+  // Form field state
+  const [ideaTitle, setIdeaTitle] = useState("");
+  const [category, setCategory] = useState<IdeaCategory>(categories[0] || "Infrastructure");
+  const [problemStatement, setProblemStatement] = useState("");
+  const [proposedSolution, setProposedSolution] = useState("");
+  const [fileAttachment, setFileAttachment] = useState<AttachedFile | null>(null);
 
-  const nowStr = new Date().toISOString().replace("T", " ").substring(0, 16);
+  // Optional author metadata
+  const [submitterName, setSubmitterName] = useState("");
+  const [submitterEmail, setSubmitterEmail] = useState("");
+  const [submitterOrg, setSubmitterOrg] = useState("");
 
-  if (existingIndex >= 0) {
-    const updated = {
-      ...list[existingIndex],
-      name: name?.trim() || list[existingIndex].name,
-      role: role || list[existingIndex].role,
-      affiliation: affiliation || list[existingIndex].affiliation,
-      notes: notes ? `${list[existingIndex].notes || ""} | ${notes}` : list[existingIndex].notes,
-      status: "Active" as const
+  // Submission lifecycle state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submittedReceipt, setSubmittedReceipt] = useState<{
+    id: string;
+    title: string;
+    category: IdeaCategory;
+    submitterName: string;
+    submitterEmail: string;
+    status: IdeaStatus;
+    createdAt: string;
+    fileName?: string;
+  } | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
     };
-    list[existingIndex] = updated;
-    localStorage.setItem(STORAGE_KEYS.MAILING_LIST, JSON.stringify(list));
-    return updated;
-  }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
-  const newItem: MailingListRegistration = {
-    id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    email: cleanEmail,
-    name: name?.trim() || cleanEmail.split("@")[0],
-    role: role || "Ecosystem Subscriber",
-    affiliation: affiliation || "961AI Network Member",
-    source,
-    subscribedAt: nowStr,
-    status: "Active",
-    gdprConsent: true,
-    notes: notes || "Registered via 961AI mailing list opt-in."
+  // Lock body scroll when open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
+  // Handle single file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const sizeStr =
+        file.size > 1024 * 1024
+          ? (file.size / (1024 * 1024)).toFixed(1) + " MB"
+          : Math.max(1, Math.round(file.size / 1024)) + " KB";
+
+      setFileAttachment({
+        id: "att-" + Date.now(),
+        name: file.name,
+        size: sizeStr,
+        type: file.type || "document"
+      });
+      setValidationError(null);
+    }
   };
 
-  list.unshift(newItem);
-  localStorage.setItem(STORAGE_KEYS.MAILING_LIST, JSON.stringify(list));
-  return newItem;
-}
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  };
 
-export function deleteMailingListRegistration(id: string): void {
-  const list = getMailingListRegistrations().filter((m) => m.id !== id);
-  localStorage.setItem(STORAGE_KEYS.MAILING_LIST, JSON.stringify(list));
-}
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
 
-export function toggleMailingListStatus(id: string): void {
-  const list = getMailingListRegistrations();
-  const idx = list.findIndex((m) => m.id === id);
-  if (idx >= 0) {
-    list[idx].status = list[idx].status === "Verified" ? "Active" : list[idx].status === "Active" ? "Unsubscribed" : "Verified";
-    localStorage.setItem(STORAGE_KEYS.MAILING_LIST, JSON.stringify(list));
-  }
-}
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      const sizeStr =
+        file.size > 1024 * 1024
+          ? (file.size / (1024 * 1024)).toFixed(1) + " MB"
+          : Math.max(1, Math.round(file.size / 1024)) + " KB";
 
-// ================= TRIAL USERS CRUD =================
-export function getTrialUsers(): TrialUser[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.TRIAL_USERS);
-    let list: TrialUser[] = raw ? JSON.parse(raw) : [];
+      setFileAttachment({
+        id: "att-" + Date.now(),
+        name: file.name,
+        size: sizeStr,
+        type: file.type || "document"
+      });
+      setValidationError(null);
+    }
+  };
 
-    if (!Array.isArray(list) || list.length === 0) {
-      list = SEED_TRIAL_USERS;
-      localStorage.setItem(STORAGE_KEYS.TRIAL_USERS, JSON.stringify(list));
+  const handleRemoveAttachment = () => {
+    setFileAttachment(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  // Clear form handler
+  const resetFormFields = () => {
+    setIdeaTitle("");
+    setCategory(categories[0] || "Infrastructure");
+    setProblemStatement("");
+    setProposedSolution("");
+    setFileAttachment(null);
+    setSubmitterName("");
+    setSubmitterEmail("");
+    setSubmitterOrg("");
+    setValidationError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  // Submit Handler
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setValidationError(null);
+
+    // Validate required fields
+    if (!ideaTitle.trim()) {
+      setValidationError("Please enter an Idea Title.");
+      return;
+    }
+    if (!category) {
+      setValidationError("Please select a Category.");
+      return;
+    }
+    if (!problemStatement.trim()) {
+      setValidationError("Please provide a Problem Statement describing the ecosystem bottleneck.");
+      return;
+    }
+    if (!proposedSolution.trim()) {
+      setValidationError("Please provide a Proposed Solution detailing how this can be executed.");
+      return;
     }
 
-    // Auto-sync with 961ai_registered_users
     try {
-      const regRaw = localStorage.getItem(STORAGE_KEYS.REGISTERED_ACCOUNTS);
-      if (regRaw) {
-        const regAccounts = JSON.parse(regRaw);
-        let updated = false;
+      setIsSubmitting(true);
+      const generatedId = "idea-" + Date.now();
+      const payloadTitle = ideaTitle.trim();
+      const payloadCategory = category;
+      const authorName = submitterName.trim() || "Community Member";
+      const authorEmail = submitterEmail.trim() || "submitter@961ai.network";
 
-        regAccounts.forEach((acc: any) => {
-          const email = (acc.email || "").trim().toLowerCase();
-          if (!email) return;
+      const newIdeaPayload: Partial<EcosystemIdea> = {
+        id: generatedId,
+        title: payloadTitle,
+        category: payloadCategory,
+        problemStatement: problemStatement.trim(),
+        proposedSolution: proposedSolution.trim(),
+        expectedImpact: "Unlocks measurable technical capability and economic impact for Lebanon's ecosystem.",
+        feedbackPreference: "Public Ecosystem Discussion",
+        submitterName: authorName,
+        submitterEmail: authorEmail,
+        submitterOrg: submitterOrg.trim() || "Lebanon AI Network",
+        attachments: fileAttachment ? [fileAttachment] : [],
+        status: "Submitted"
+      };
 
-          // Check if this account is already in trial list
-          const exists = list.find((t) => t.email.toLowerCase() === email);
-          const isPremium = acc.session?.isPremium || false;
+      await onSubmitIdea(newIdeaPayload);
 
-          if (!exists && !isPremium) {
-            const demoExpires = acc.session?.demoExpiresAt || Date.now() + 6 * 3600 * 1000;
-            const isTrialActive = demoExpires > Date.now();
+      // Save receipt for success state
+      setSubmittedReceipt({
+        id: generatedId,
+        title: payloadTitle,
+        category: payloadCategory,
+        submitterName: authorName,
+        submitterEmail: authorEmail,
+        status: "Submitted",
+        createdAt: new Date().toISOString(),
+        fileName: fileAttachment?.name
+      });
 
-            list.unshift({
-              id: `trial_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-              email,
-              name: acc.name || acc.session?.name || email.split("@")[0],
-              role: acc.role || acc.session?.role || "Founder",
-              affiliation: acc.affiliation || acc.session?.affiliation || "Independent Tech Leader",
-              whatsappPhone: acc.session?.whatsapp_phone || "",
-              registeredAt: new Date(acc.session?.createdAt || Date.now()).toISOString().replace("T", " ").substring(0, 16),
-              demoExpiresAt: demoExpires,
-              isTrialActive,
-              credits: acc.session?.credits ?? 50,
-              secondBrainId: acc.session?.z961_second_brain_id || `ws_${email.split("@")[0]}`,
-              status: isTrialActive ? "Active Trial" : "Expired Demo",
-              notes: "Signed up via platform registration modal."
-            });
-            updated = true;
-          }
-        });
+      // Clear the form fields as required
+      resetFormFields();
 
-        if (updated) {
-          localStorage.setItem(STORAGE_KEYS.TRIAL_USERS, JSON.stringify(list));
-        }
-      }
-    } catch {
-      // ignore
+      // Show success state
+      setSubmitSuccess(true);
+    } catch (err: any) {
+      setValidationError("Failed to submit idea: " + (err?.message || "Please try again."));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    return list;
-  } catch {
-    return SEED_TRIAL_USERS;
-  }
-}
-
-export function addTrialUser(user: Partial<TrialUser> & { email: string; name: string }): TrialUser {
-  const list = getTrialUsers();
-  const cleanEmail = user.email.trim().toLowerCase();
-  const now = Date.now();
-  const demoExpiresAt = user.demoExpiresAt || now + 6 * 3600 * 1000;
-
-  const newTrial: TrialUser = {
-    id: `trial_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    email: cleanEmail,
-    name: user.name.trim(),
-    role: user.role || "Founder",
-    affiliation: user.affiliation || "Independent Tech Leader",
-    whatsappPhone: user.whatsappPhone || "",
-    registeredAt: new Date().toISOString().replace("T", " ").substring(0, 16),
-    demoExpiresAt,
-    isTrialActive: demoExpiresAt > now,
-    credits: user.credits ?? 50,
-    secondBrainId: user.secondBrainId || `ws_${cleanEmail.split("@")[0]}`,
-    status: demoExpiresAt > now ? "Active Trial" : "Expired Demo",
-    notes: user.notes || "Free 6-hour demo session started."
   };
 
-  const existingIndex = list.findIndex((t) => t.email.toLowerCase() === cleanEmail);
-  if (existingIndex >= 0) {
-    list[existingIndex] = newTrial;
-  } else {
-    list.unshift(newTrial);
-  }
-
-  localStorage.setItem(STORAGE_KEYS.TRIAL_USERS, JSON.stringify(list));
-  return newTrial;
-}
-
-export function extendTrialTime(id: string, hoursToAdd = 24): void {
-  const list = getTrialUsers();
-  const idx = list.findIndex((t) => t.id === id);
-  if (idx >= 0) {
-    const currentExpiry = Math.max(list[idx].demoExpiresAt, Date.now());
-    list[idx].demoExpiresAt = currentExpiry + hoursToAdd * 3600 * 1000;
-    list[idx].isTrialActive = true;
-    list[idx].status = "Active Trial";
-    list[idx].credits = (list[idx].credits || 0) + 100;
-    list[idx].notes = `${list[idx].notes || ""} | Trial extended +${hoursToAdd}h by Admin.`;
-    localStorage.setItem(STORAGE_KEYS.TRIAL_USERS, JSON.stringify(list));
-  }
-}
-
-export function deleteTrialUser(id: string): void {
-  const list = getTrialUsers().filter((t) => t.id !== id);
-  localStorage.setItem(STORAGE_KEYS.TRIAL_USERS, JSON.stringify(list));
-}
-
-// ================= CONFIRMED SUBSCRIBERS CRUD =================
-export function getConfirmedSubscribers(): ConfirmedSubscriber[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS, JSON.stringify(SEED_CONFIRMED_SUBSCRIBERS));
-      return SEED_CONFIRMED_SUBSCRIBERS;
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      localStorage.setItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS, JSON.stringify(SEED_CONFIRMED_SUBSCRIBERS));
-      return SEED_CONFIRMED_SUBSCRIBERS;
-    }
-    return parsed;
-  } catch {
-    return SEED_CONFIRMED_SUBSCRIBERS;
-  }
-}
-
-export function addConfirmedSubscriber(
-  sub: {
-    email: string;
-    name?: string;
-    phone?: string;
-    affiliation?: string;
-    paymentMethod: "OMT" | "WHISH" | "USDT (TRC20)";
-    paymentRef?: string;
-    amountPaid?: string;
-    paymentStatus?: SubscriptionPaymentStatus;
-  }
-): ConfirmedSubscriber {
-  const list = getConfirmedSubscribers();
-  const cleanEmail = (sub.email || "").trim().toLowerCase();
-  const now = new Date();
-  const oneYearLater = new Date(now.getTime() + 365 * 24 * 3600 * 1000);
-
-  const confirmedItem: ConfirmedSubscriber = {
-    id: `sub_paid_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    email: cleanEmail,
-    name: sub.name?.trim() || cleanEmail.split("@")[0],
-    phone: sub.phone || "+961 81 041 334",
-    affiliation: sub.affiliation || "961AI Network Member",
-    plan: "Annual Pro ($100/yr)",
-    amountPaid: sub.amountPaid || "$100 USD",
-    paymentMethod: sub.paymentMethod,
-    paymentRef: sub.paymentRef?.trim() || `${sub.paymentMethod}-${Date.now().toString().slice(-6)}`,
-    confirmedAt: now.toISOString().replace("T", " ").substring(0, 16),
-    expiresAt: oneYearLater.toISOString().replace("T", " ").substring(0, 16),
-    paymentStatus: sub.paymentStatus || (sub.paymentMethod === "USDT (TRC20)" ? "Manual Payment Confirmed" : "Pending Approval"),
-    salesContactStatus: "Pending Contact",
-    salesNotes: `Subscribed via ${sub.paymentMethod}. Sales team notification generated.`
+  const handleStartNewSubmission = () => {
+    resetFormFields();
+    setSubmitSuccess(false);
+    setSubmittedReceipt(null);
   };
 
-  const existingIdx = list.findIndex((s) => s.email.toLowerCase() === cleanEmail);
-  if (existingIdx >= 0) {
-    list[existingIdx] = confirmedItem;
-  } else {
-    list.unshift(confirmedItem);
-  }
-
-  localStorage.setItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS, JSON.stringify(list));
-
-  // If user is also in trial list, mark as Converted to Paid
-  try {
-    const trials = getTrialUsers();
-    const trialIdx = trials.findIndex((t) => t.email.toLowerCase() === cleanEmail);
-    if (trialIdx >= 0) {
-      trials[trialIdx].status = "Converted to Paid";
-      trials[trialIdx].notes = `Upgraded to Annual Pro via ${sub.paymentMethod}.`;
-      localStorage.setItem(STORAGE_KEYS.TRIAL_USERS, JSON.stringify(trials));
-    }
-  } catch {
-    // ignore
-  }
-
-  return confirmedItem;
-}
-
-export function updateSubscriptionPaymentStatus(
-  id: string,
-  newStatus: SubscriptionPaymentStatus,
-  options: { triggerNotification?: boolean; autoSendNotification?: boolean } = { triggerNotification: true }
-): ConfirmedSubscriber | null {
-  const list = getConfirmedSubscribers();
-  const idx = list.findIndex((s) => s.id === id);
-  if (idx >= 0) {
-    const prevStatus = list[idx].paymentStatus;
-    list[idx].paymentStatus = newStatus;
-    list[idx].salesNotes = `${list[idx].salesNotes || ""} | Payment status shifted to ${newStatus} on ${new Date().toISOString().substring(0, 10)}.`;
-    localStorage.setItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS, JSON.stringify(list));
-
-    // Auto trigger notification into queue if status changed and option enabled
-    if (options.triggerNotification !== false && prevStatus !== newStatus) {
-      try {
-        triggerNotificationForSubscriberStatus({
-          userId: list[idx].id,
-          userName: list[idx].name,
-          userEmail: list[idx].email,
-          userPhone: list[idx].phone,
-          userPlan: list[idx].plan,
-          paymentMethod: list[idx].paymentMethod,
-          paymentRef: list[idx].paymentRef,
-          amount: list[idx].amountPaid,
-          newStatus,
-          channel: "email",
-          autoSend: options.autoSendNotification ?? false
-        });
-      } catch (err) {
-        console.error("Failed to enqueue notification:", err);
+  const handleDrawerClose = () => {
+    onClose();
+    // After drawer finishes closing, if in success state, reset for next open
+    setTimeout(() => {
+      if (submitSuccess) {
+        setSubmitSuccess(false);
+        setSubmittedReceipt(null);
       }
-    }
+    }, 300);
+  };
 
-    return list[idx];
-  }
-  return null;
-}
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
+          {/* Backdrop with fade-in / fade-out */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
+            onClick={handleDrawerClose}
+            aria-hidden="true"
+          />
 
-export function updateSalesContactStatus(
-  id: string,
-  newStatus: ConfirmedSubscriber["salesContactStatus"]
-): void {
-  const list = getConfirmedSubscribers();
-  const idx = list.findIndex((s) => s.id === id);
-  if (idx >= 0) {
-    list[idx].salesContactStatus = newStatus;
-    list[idx].salesNotes = `${list[idx].salesNotes || ""} | Status changed to ${newStatus} on ${new Date().toISOString().substring(0, 10)}.`;
-    localStorage.setItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS, JSON.stringify(list));
-  }
-}
+          {/* Slide-over panel container */}
+          <div className="fixed inset-y-0 right-0 flex max-w-full pl-6 sm:pl-10 pointer-events-none">
+            <motion.div
+              initial={{ x: "100%", opacity: 0.5 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="pointer-events-auto w-screen max-w-xl bg-white shadow-2xl flex flex-col h-full overflow-hidden border-l border-slate-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Drawer Header */}
+              <div className="p-5 sm:p-6 bg-slate-900 text-white flex items-start justify-between border-b border-slate-800 shrink-0">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-amber-400 text-xs font-mono font-bold tracking-wider uppercase">
+                    <Lightbulb className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>IdeasLab Intake Pipeline</span>
+                  </div>
+                  <h2 className="text-xl font-bold font-mono text-white tracking-tight">
+                    Submit Your Idea
+                  </h2>
+                  <p className="text-xs text-slate-300 font-sans leading-snug max-w-md">
+                    Propose sovereign AI infrastructure, open models, diaspora funding, or regulatory frameworks.
+                  </p>
+                </div>
 
-export function deleteConfirmedSubscriber(id: string): void {
-  const list = getConfirmedSubscribers().filter((s) => s.id !== id);
-  localStorage.setItem(STORAGE_KEYS.CONFIRMED_SUBSCRIBERS, JSON.stringify(list));
-}
+                <button
+                  id="btn-close-idea-drawer"
+                  onClick={handleDrawerClose}
+                  className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition-colors shrink-0 ml-3"
+                  aria-label="Close drawer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-// Global combined export
-export function exportAllRegisteredUsersCsv(): string {
-  const mailing = getMailingListRegistrations();
-  const trials = getTrialUsers();
-  const confirmed = getConfirmedSubscribers();
+              {/* Drawer Body: Form or Success State */}
+              <div className="flex-1 overflow-y-auto">
+                {submitSuccess && submittedReceipt ? (
+                  /* ======================================================== */
+                  /* SUCCESS STATE VIEW                                       */
+                  /* ======================================================== */
+                  <div className="p-6 sm:p-8 space-y-6 font-mono">
+                    <motion.div
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                      className="text-center space-y-3"
+                    >
+                      <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto shadow-xs border border-emerald-200">
+                        <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          PROPOSAL REGISTERED
+                        </span>
+                        <h3 className="text-xl font-bold text-slate-900">
+                          Idea Submitted Successfully!
+                        </h3>
+                        <p className="text-xs text-slate-600 max-w-md mx-auto font-sans leading-relaxed">
+                          Your proposal has been logged into the 961 AI Network ecosystem repository and assigned an active pipeline tracking beacon.
+                        </p>
+                      </div>
+                    </motion.div>
 
-  const lines: string[] = [
-    "--- CATEGORY 1: REGISTERED ON MAILING LIST ---",
-    "ID,Name,Email,Role,Affiliation,Source,SubscribedAt,Status,GDPR",
-    ...mailing.map((m) => `"${m.id}","${m.name}","${m.email}","${m.role || ''}","${m.affiliation || ''}","${m.source}","${m.subscribedAt}","${m.status}","${m.gdprConsent ? 'Yes' : 'No'}"`),
-    "",
-    "--- CATEGORY 2: USERS ON FREE TRIAL ---",
-    "ID,Name,Email,Role,Affiliation,WhatsApp,RegisteredAt,Status,Credits",
-    ...trials.map((t) => `"${t.id}","${t.name}","${t.email}","${t.role}","${t.affiliation}","${t.whatsappPhone || ''}","${t.registeredAt}","${t.status}","${t.credits}"`),
-    "",
-    "--- CATEGORY 3: CONFIRMED PAID SUBSCRIBERS ---",
-    "ID,Name,Email,Phone,Affiliation,Plan,Amount,PaymentMethod,PaymentRef,ConfirmedAt,PaymentStatus,SalesStatus",
-    ...confirmed.map((c) => `"${c.id}","${c.name}","${c.email}","${c.phone || ''}","${c.affiliation || ''}","${c.plan}","${c.amountPaid}","${c.paymentMethod}","${c.paymentRef}","${c.confirmedAt}","${c.paymentStatus}","${c.salesContactStatus}"`)
-  ];
+                    {/* Receipt Card */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+                      <div className="border-b border-slate-200 pb-3 flex items-start justify-between gap-3">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
+                            Idea Title
+                          </span>
+                          <h4 className="text-sm font-bold text-slate-900 mt-0.5">
+                            {submittedReceipt.title}
+                          </h4>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                          {submittedReceipt.status}
+                        </span>
+                      </div>
 
-  return lines.join("\n");
-}
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                            Category
+                          </span>
+                          <span className="font-bold text-slate-800">
+                            {submittedReceipt.category}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                            Submitted By
+                          </span>
+                          <span className="font-bold text-slate-800 truncate block">
+                            {submittedReceipt.submitterName}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                            Tracking ID
+                          </span>
+                          <span className="font-mono text-slate-700 text-[11px]">
+                            {submittedReceipt.id}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                            Timestamp
+                          </span>
+                          <span className="text-slate-700 text-[11px]">
+                            {new Date(submittedReceipt.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })}
+                          </span>
+                        </div>
+
+                        {submittedReceipt.fileName && (
+                          <div className="col-span-2 pt-2 border-t border-slate-200">
+                            <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                              Attached Spec / Deck
+                            </span>
+                            <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 text-[11px] text-slate-700">
+                              <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="font-mono truncate">{submittedReceipt.fileName}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Status simulation controls if trigger callback provided */}
+                      {onTriggerStatusUpdate && (
+                        <div className="pt-3 border-t border-slate-200 space-y-2">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                            <span>Admin Lifecycle Simulation:</span>
+                            <span className="text-[10px] text-slate-500 font-normal">Test triggers</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {(["Under Review", "Planned", "Completed"] as IdeaStatus[]).map((st) => (
+                              <button
+                                key={st}
+                                type="button"
+                                onClick={() => {
+                                  onTriggerStatusUpdate(submittedReceipt.id, st, "Lifecycle update");
+                                  setSubmittedReceipt((prev) => (prev ? { ...prev, status: st } : null));
+                                }}
+                                className="px-2.5 py-1 text-[10px] rounded-lg border border-slate-300 bg-white hover:bg-slate-100 font-bold transition-colors"
+                              >
+                                Advance to '{st}'
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                      <button
+                        id="btn-submit-another-idea"
+                        type="button"
+                        onClick={handleStartNewSubmission}
+                        className="w-full sm:w-1/2 py-2.5 px-4 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs font-bold font-mono transition-colors flex items-center justify-center gap-2"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Submit Another Idea</span>
+                      </button>
+
+                      <button
+                        id="btn-done-close-drawer"
+                        type="button"
+                        onClick={handleDrawerClose}
+                        className="w-full sm:w-1/2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold font-mono transition-colors flex items-center justify-center gap-2 shadow-xs"
+                      >
+                        <span>Done / Close Drawer</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ======================================================== */
+                  /* INTAKE FORM VIEW                                         */
+                  /* ======================================================== */
+                  <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5 font-mono text-xs">
+                    {/* Informational banner */}
+                    <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-start gap-3">
+                      <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <div className="text-[11px] font-sans text-emerald-950 leading-relaxed">
+                        <span className="font-bold block text-emerald-900 font-mono text-xs">
+                          Ecosystem Direct-Review
+                        </span>
+                        Submissions are triaged by working group leads across Lebanese universities, diaspora syndicates, and technical partners.
+                      </div>
+                    </div>
+
+                    {validationError && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-mono">
+                        {validationError}
+                      </div>
+                    )}
+
+                    {/* 1. Idea Title */}
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="drawer-idea-title"
+                        className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider"
+                      >
+                        Idea Title <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="drawer-idea-title"
+                        type="text"
+                        required
+                        value={ideaTitle}
+                        onChange={(e) => {
+                          setIdeaTitle(e.target.value);
+                          if (validationError) setValidationError(null);
+                        }}
+                        placeholder="e.g., Sovereign Arabic LLM Fine-Tuning Cluster"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:bg-white text-slate-900 outline-none text-xs font-mono transition-all"
+                      />
+                    </div>
+
+                    {/* 2. Category Dropdown */}
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="drawer-category"
+                        className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider"
+                      >
+                        Category <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="drawer-category"
+                          required
+                          value={category}
+                          onChange={(e) => {
+                            setCategory(e.target.value as IdeaCategory);
+                            if (validationError) setValidationError(null);
+                          }}
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:bg-white text-slate-900 outline-none text-xs font-mono appearance-none transition-all cursor-pointer"
+                        >
+                          {categories.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                          <Layers className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3. Problem Statement */}
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="drawer-problem-statement"
+                        className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider"
+                      >
+                        Problem Statement <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        id="drawer-problem-statement"
+                        required
+                        rows={3}
+                        value={problemStatement}
+                        onChange={(e) => {
+                          setProblemStatement(e.target.value);
+                          if (validationError) setValidationError(null);
+                        }}
+                        placeholder="What friction, missing compute, talent leakage, or regulatory barrier does this solve for Lebanon?"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:bg-white text-slate-900 outline-none text-xs font-sans leading-relaxed transition-all"
+                      />
+                    </div>
+
+                    {/* 4. Proposed Solution */}
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="drawer-proposed-solution"
+                        className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider"
+                      >
+                        Proposed Solution <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        id="drawer-proposed-solution"
+                        required
+                        rows={4}
+                        value={proposedSolution}
+                        onChange={(e) => {
+                          setProposedSolution(e.target.value);
+                          if (validationError) setValidationError(null);
+                        }}
+                        placeholder="How should the ecosystem execute this? Outline the technical architecture, operational model, or required stakeholders..."
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:bg-white text-slate-900 outline-none text-xs font-sans leading-relaxed transition-all"
+                      />
+                    </div>
+
+                    {/* 5. Optional File Attachment Field */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="drawer-file-upload"
+                          className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider"
+                        >
+                          Attachment (Optional)
+                        </label>
+                        <span className="text-[10px] text-slate-500 font-normal">
+                          PDF, DOCX, Deck up to 10MB
+                        </span>
+                      </div>
+
+                      <input
+                        ref={fileInputRef}
+                        id="drawer-file-upload"
+                        type="file"
+                        className="hidden"
+                        onChange={handleFileChange}
+                        accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.png,.jpg,.jpeg"
+                      />
+
+                      {!fileAttachment ? (
+                        <div
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          onDrop={handleDrop}
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
+                            isDraggingOver
+                              ? "border-emerald-500 bg-emerald-50/50"
+                              : "border-slate-300 hover:border-emerald-500 hover:bg-slate-50"
+                          }`}
+                        >
+                          <UploadCloud className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
+                          <div className="text-xs text-emerald-700 font-bold">
+                            Click or drag file to attach
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-sans mt-0.5">
+                            Whitepapers, architecture diagrams, or pitch briefs
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between p-3 bg-slate-50 border border-emerald-300 rounded-xl">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                              <FileText className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-slate-800 truncate block text-xs">
+                                {fileAttachment.name}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                {fileAttachment.size}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleRemoveAttachment}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-slate-200 transition-colors"
+                            aria-label="Remove attachment"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Author Metadata (Optional) */}
+                    <div className="pt-2 border-t border-slate-100 space-y-3">
+                      <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                        Submitter Attribution (Optional)
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label
+                            htmlFor="drawer-submitter-name"
+                            className="block text-[10px] font-bold text-slate-600 mb-1"
+                          >
+                            Your Name / Alias
+                          </label>
+                          <input
+                            id="drawer-submitter-name"
+                            type="text"
+                            value={submitterName}
+                            onChange={(e) => setSubmitterName(e.target.value)}
+                            placeholder="e.g. Maya Warde"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white text-slate-900"
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            htmlFor="drawer-submitter-email"
+                            className="block text-[10px] font-bold text-slate-600 mb-1"
+                          >
+                            Email Address
+                          </label>
+                          <input
+                            id="drawer-submitter-email"
+                            type="email"
+                            value={submitterEmail}
+                            onChange={(e) => setSubmitterEmail(e.target.value)}
+                            placeholder="maya@example.com"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white text-slate-900"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sticky Footer with Submit Button */}
+                    <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3 sticky bottom-0 bg-white pb-2">
+                      <button
+                        type="button"
+                        onClick={handleDrawerClose}
+                        className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-bold font-mono transition-colors"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        id="btn-drawer-submit"
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-300 text-white font-bold font-mono text-xs transition-all shadow-xs flex items-center gap-2"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>Submitting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Submit</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
