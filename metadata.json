@@ -1,0 +1,6 @@
+{
+  "name": "961AINetwork SaaS",
+  "description": "The Platform for Lebanon AI Community and Stakeholders — Sovereign Second Brain Notebook LLM workspace, cross-linked intelligence platform mapping verified Lebanese AI ventures, software agencies, academic researchers, capital networks, and Lebanon Regulatory Sandbox with startup laws and AI Legal Copilot.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
